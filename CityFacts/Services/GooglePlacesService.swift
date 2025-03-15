@@ -237,56 +237,238 @@ class GooglePlacesService {
     func fetchTouristAttractions(for city: City) async throws -> [TouristAttraction] {
         print("\n=== Fetching Tourist Attractions for \(city.name) ===")
         
-        // First, get the city's actual landmarks
-        var attractions = city.landmarks.map { landmark in
-            TouristAttraction(
-                id: UUID(),
-                name: landmark.name,
-                description: landmark.description,
-                category: .historical,
-                estimatedDuration: 120,
-                coordinates: TouristAttraction.Coordinates(
-                    latitude: city.coordinates.latitude,
-                    longitude: city.coordinates.longitude
-                ),
-                imageURL: landmark.imageURL,
-                tips: ["Best time to visit: Early morning", "Photography allowed"],
-                websiteURL: nil
-            )
+        // Create a set to track unique place names to prevent duplicates
+        var seenNames = Set<String>()
+        var attractions: [TouristAttraction] = []
+        
+        // First, search for the city's landmarks using Places API to get proper photos
+        for landmark in city.landmarks {
+            print("Searching for landmark: \(landmark.name)")
+            let searchQuery = "\(landmark.name) in \(city.name)"
+            let places = try await searchPlaces(query: searchQuery)
+            
+            if let place = places.first {
+                // Use the first matching place
+                let imageURL = place.photos?.first?.photoURL ?? getFallbackImageURL(for: .historical)
+                
+                let attraction = TouristAttraction(
+                    id: UUID(),
+                    name: landmark.name,
+                    description: landmark.description,
+                    category: .historical,
+                    estimatedDuration: estimateVisitDuration(type: "landmark", name: landmark.name),
+                    coordinates: TouristAttraction.Coordinates(
+                        latitude: place.location.latitude,
+                        longitude: place.location.longitude
+                    ),
+                    imageURL: imageURL,
+                    tips: generateTips(for: .historical),
+                    websiteURL: nil
+                )
+                attractions.append(attraction)
+                seenNames.insert(landmark.name)
+            } else {
+                // Fallback to original landmark data if no match found
+                print("No Places API match found for landmark: \(landmark.name)")
+                let attraction = TouristAttraction(
+                    id: UUID(),
+                    name: landmark.name,
+                    description: landmark.description,
+                    category: .historical,
+                    estimatedDuration: estimateVisitDuration(type: "landmark", name: landmark.name),
+                    coordinates: TouristAttraction.Coordinates(
+                        latitude: city.coordinates.latitude,
+                        longitude: city.coordinates.longitude
+                    ),
+                    imageURL: landmark.imageURL ?? getFallbackImageURL(for: .historical),
+                    tips: generateTips(for: .historical),
+                    websiteURL: nil
+                )
+                attractions.append(attraction)
+                seenNames.insert(landmark.name)
+            }
         }
         
         // Then, fetch nearby tourist attractions using the Places API
-        let searchQuery = "tourist attractions in \(city.name)"
+        let searchQuery = "top tourist attractions in \(city.name)"
         let places = try await searchPlaces(query: searchQuery)
         
         // Convert Places to TouristAttractions
         for place in places {
-            // Determine the category based on the place's types
-            let category = determineCategory(from: place.types)
+            let name = place.displayName.text
             
-            // Get the first photo URL if available
-            let imageURL = place.photos?.first?.photoURL ?? "https://images.unsplash.com/photo-1511818966892-d7d671e672a2"
+            // Skip if we've already seen this name
+            guard !seenNames.contains(name) else { continue }
+            
+            // Determine the category and estimated duration based on place types
+            let category = determineCategory(from: place.types)
+            let duration = estimateVisitDuration(type: place.types.first ?? "tourist_attraction", name: name)
+            
+            // Get the photo URL if available, otherwise use a relevant fallback
+            var imageURL = getFallbackImageURL(for: category)
+            if let photos = place.photos, !photos.isEmpty {
+                if let firstPhotoURL = photos.first?.photoURL {
+                    imageURL = firstPhotoURL
+                    print("Using place photo URL: \(firstPhotoURL)")
+                } else {
+                    print("Failed to get photo URL for place: \(name)")
+                }
+            }
             
             let attraction = TouristAttraction(
                 id: UUID(),
-                name: place.displayName.text,
+                name: name,
                 description: place.formattedAddress,
                 category: category,
-                estimatedDuration: 120, // Default duration
+                estimatedDuration: duration,
                 coordinates: TouristAttraction.Coordinates(
                     latitude: place.location.latitude,
                     longitude: place.location.longitude
                 ),
                 imageURL: imageURL,
-                tips: ["Check opening hours", "Plan your visit"],
+                tips: generateTips(for: category),
                 websiteURL: nil
             )
             
             attractions.append(attraction)
+            seenNames.insert(name)
         }
         
-        // Limit to 20 attractions total
-        return Array(attractions.prefix(20))
+        // Sort attractions by category and limit to 15 total to ensure a good mix
+        return Array(attractions.prefix(15))
+    }
+    
+    private func estimateVisitDuration(type: String, name: String) -> TimeInterval {
+        // Convert minutes to seconds (TimeInterval)
+        let minutesToSeconds: (Int) -> TimeInterval = { minutes in
+            TimeInterval(minutes * 60)
+        }
+        
+        // Duration in minutes, converted to seconds
+        switch type.lowercased() {
+        case "museum":
+            return minutesToSeconds(180) // 3 hours
+        case "art_gallery":
+            return minutesToSeconds(120) // 2 hours
+        case "park", "garden":
+            return minutesToSeconds(90) // 1.5 hours
+        case "church", "temple", "mosque", "religious":
+            return minutesToSeconds(60) // 1 hour
+        case "landmark", "monument":
+            return minutesToSeconds(90) // 1.5 hours
+        case "restaurant", "cafe":
+            return minutesToSeconds(90) // 1.5 hours
+        case "shopping_mall":
+            return minutesToSeconds(120) // 2 hours
+        case "amusement_park", "theme_park":
+            return minutesToSeconds(300) // 5 hours
+        case "zoo", "aquarium":
+            return minutesToSeconds(240) // 4 hours
+        default:
+            // Check name for keywords that might indicate a major attraction
+            let lowercaseName = name.lowercased()
+            if lowercaseName.contains("palace") || lowercaseName.contains("castle") {
+                return minutesToSeconds(180) // 3 hours
+            } else if lowercaseName.contains("tower") || lowercaseName.contains("cathedral") {
+                return minutesToSeconds(120) // 2 hours
+            } else {
+                return minutesToSeconds(90) // 1.5 hours default
+            }
+        }
+    }
+    
+    private func getFallbackImageURL(for category: TouristAttraction.Category) -> String {
+        switch category {
+        case .museum:
+            return "https://images.unsplash.com/photo-1518998053901-5348d3961a04"
+        case .cultural:
+            return "https://images.unsplash.com/photo-1577083552431-6e5fd01988ec"
+        case .historical:
+            return "https://images.unsplash.com/photo-1589828994425-a83f2f9b8488"
+        case .nature:
+            return "https://images.unsplash.com/photo-1511497584788-876760111969"
+        case .entertainment:
+            return "https://images.unsplash.com/photo-1514525253161-7a46d19cd819"
+        case .dining:
+            return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+        case .shopping:
+            return "https://images.unsplash.com/photo-1441986300917-64674bd600d8"
+        case .religious:
+            return "https://images.unsplash.com/photo-1548276145-69a9521f0499"
+        case .architecture:
+            return "https://images.unsplash.com/photo-1487958449943-2429e8be8625"
+        case .park:
+            return "https://images.unsplash.com/photo-1519331379826-f10be5486c6f"
+        }
+    }
+    
+    private func generateTips(for category: TouristAttraction.Category) -> [String] {
+        var tips = ["Check opening hours before visiting"]
+        
+        switch category {
+        case .museum:
+            tips.append(contentsOf: [
+                "Consider guided tours for better experience",
+                "Check for special exhibitions",
+                "Many museums have free or discounted days"
+            ])
+        case .cultural:
+            tips.append(contentsOf: [
+                "Book tickets in advance for shows",
+                "Check for local events and festivals",
+                "Research cultural etiquette"
+            ])
+        case .historical:
+            tips.append(contentsOf: [
+                "Morning visits usually have fewer crowds",
+                "Consider hiring a local guide",
+                "Photography may be restricted in some areas"
+            ])
+        case .nature:
+            tips.append(contentsOf: [
+                "Check weather forecast before visiting",
+                "Bring appropriate footwear",
+                "Carry water and snacks"
+            ])
+        case .entertainment:
+            tips.append(contentsOf: [
+                "Book tickets online to avoid queues",
+                "Check for package deals",
+                "Visit during off-peak hours"
+            ])
+        case .dining:
+            tips.append(contentsOf: [
+                "Reservations recommended",
+                "Try local specialties",
+                "Ask staff for recommendations"
+            ])
+        case .shopping:
+            tips.append(contentsOf: [
+                "Compare prices across shops",
+                "Check return policies",
+                "Ask about tax refund options"
+            ])
+        case .religious:
+            tips.append(contentsOf: [
+                "Dress modestly",
+                "Check if visits are allowed during services",
+                "Maintain quiet and respectful behavior"
+            ])
+        case .architecture:
+            tips.append(contentsOf: [
+                "Best photos usually early morning or sunset",
+                "Look for guided architecture tours",
+                "Check if interior visits are possible"
+            ])
+        case .park:
+            tips.append(contentsOf: [
+                "Early morning or late afternoon best for photos",
+                "Check for seasonal attractions",
+                "Bring picnic supplies"
+            ])
+        }
+        
+        return tips
     }
     
     private func determineCategory(from types: [String]) -> TouristAttraction.Category {
@@ -381,38 +563,17 @@ struct Photo: Codable {
     }
     
     var photoURL: String? {
-        guard let uri = uri else { 
-            print("Photo URI is nil")
+        guard let name = name.components(separatedBy: "/").last else { 
+            print("Photo name is invalid")
             return nil 
         }
         
-        print("Processing photo URI: \(uri)")
-        
-        // The Places API returns URIs in the format: "https://lh3.googleusercontent.com/..."
-        // We need to ensure it's a valid URL and add the maxwidth parameter
-        if uri.hasPrefix("https://") || uri.hasPrefix("http://") {
-            print("Found full URL, adding maxwidth parameter")
-            // If it's already a full URL, just add the maxwidth parameter
-            if let url = URL(string: uri) {
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-                components?.queryItems = [URLQueryItem(name: "maxwidth", value: "800")]
-                if let finalURL = components?.url {
-                    let urlString = finalURL.absoluteString
-                    print("Generated URL: \(urlString)")
-                    return urlString
-                }
-            }
-        } else {
-            print("Found photo reference, constructing full URL")
-            // If it's just a path, construct the full URL using the Places API photo endpoint
-            if let url = GooglePlacesConfig.buildPhotoURL(photoReference: uri) {
-                let urlString = url.absoluteString
-                print("Generated URL: \(urlString)")
-                return urlString
-            }
-        }
-        print("Failed to generate valid URL")
-        return nil
+        // Construct the Places Photo URL with the photo reference
+        let baseURL = "https://places.googleapis.com/v1/"
+        let maxWidth = 800 // Maximum width for photos
+        let photoURL = "\(baseURL)\(self.name)/media?maxWidthPx=\(maxWidth)&key=\(GooglePlacesConfig.apiKey)"
+        print("Generated photo URL: \(photoURL)")
+        return photoURL
     }
 }
 
