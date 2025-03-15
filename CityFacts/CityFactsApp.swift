@@ -6,7 +6,7 @@ struct CityFactsApp: App {
     
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            ContentView()
                 .environmentObject(cityStore)
         }
     }

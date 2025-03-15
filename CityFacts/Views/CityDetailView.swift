@@ -6,6 +6,7 @@ struct CityDetailView: View {
     @EnvironmentObject private var cityStore: CityStore
     @State private var selectedTab = 0
     @State private var region: MKCoordinateRegion
+    @State private var showingMap = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     init(city: City) {
@@ -61,6 +62,14 @@ struct CityDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    showingMap = true
+                } label: {
+                    Image(systemName: "map")
+                }
+            }
+            
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     cityStore.toggleFavorite(for: city)
                 } label: {
                     Image(systemName: cityStore.isFavorite(city) ? "star.fill" : "star")
@@ -69,6 +78,23 @@ struct CityDetailView: View {
             
             ToolbarItem(placement: .topBarTrailing) {
                 ShareLink(item: "Check out \(city.name)!", subject: Text("City Facts: \(city.name)"))
+            }
+        }
+        .sheet(isPresented: $showingMap) {
+            NavigationStack {
+                Map(coordinateRegion: $region, annotationItems: [city]) { city in
+                    MapMarker(coordinate: city.location)
+                }
+                .edgesIgnoringSafeArea(.all)
+                .navigationTitle("\(city.name) Map")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            showingMap = false
+                        }
+                    }
+                }
             }
         }
     }

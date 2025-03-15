@@ -3,6 +3,7 @@ import SwiftUI
 struct CitiesListView: View {
     @EnvironmentObject private var cityStore: CityStore
     @State private var showingFilters = false
+    @State private var selectedCity: City?
     
     var body: some View {
         List {
@@ -11,6 +12,13 @@ struct CitiesListView: View {
                     CityDetailView(city: city)
                 } label: {
                     CityRowView(city: city)
+                }
+                .contextMenu {
+                    Button {
+                        selectedCity = city
+                    } label: {
+                        Label("Show on Map", systemImage: "map")
+                    }
                 }
             }
         }
@@ -26,10 +34,23 @@ struct CitiesListView: View {
                         .symbolVariant(cityStore.selectedContinent != nil || cityStore.selectedPopulationRange != nil ? .fill : .none)
                 }
             }
+            
+            ToolbarItem(placement: .topBarLeading) {
+                NavigationLink {
+                    MapView()
+                } label: {
+                    Image(systemName: "map")
+                }
+            }
         }
         .sheet(isPresented: $showingFilters) {
             FilterView()
                 .presentationDetents([.medium])
+        }
+        .sheet(item: $selectedCity) { city in
+            NavigationStack {
+                MapView(initialCity: city)
+            }
         }
     }
 }

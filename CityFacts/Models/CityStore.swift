@@ -71,13 +71,7 @@ class CityStore: ObservableObject {
         UserDefaults.standard.set(favoriteIds, forKey: "FavoriteCities")
     }
     
-    func loadCities() {
-        isLoading = true
-        cities = Self.citiesData.sorted { $0.population > $1.population }
-        isLoading = false
-    }
-    
     init() {
-        loadCities()
+        cities = Self.citiesData.sorted { $0.population > $1.population }
     }
 } 

@@ -100,76 +100,89 @@ struct CityPickerView: View {
 struct ItineraryView: View {
     let city: City
     let numberOfDays: Int
+    @State private var attractions: [TouristAttraction] = []
+    @State private var isLoading = true
+    @State private var error: Error?
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedCategory: TouristAttraction.Category?
-    
-    var attractions: [TouristAttraction] {
-        TouristAttraction.generateAttractions(for: city)
-    }
-    
-    var dailyItineraries: [[TouristAttraction]] {
-        // Group attractions into daily itineraries
-        let attractionsPerDay = max(1, attractions.count / numberOfDays)
-        
-        return stride(from: 0, to: attractions.count, by: attractionsPerDay).map {
-            Array(attractions[$0..<min($0 + attractionsPerDay, attractions.count)])
-        }
-    }
-    
-    var filteredAttractions: [TouristAttraction] {
-        if let category = selectedCategory {
-            return attractions.filter { $0.category == category }
-        }
-        return attractions
-    }
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Category filter
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            CategoryButton(title: "All", isSelected: selectedCategory == nil) {
-                                selectedCategory = nil
-                            }
-                            
-                            ForEach(TouristAttraction.Category.allCases, id: \.self) { category in
-                                CategoryButton(
-                                    title: category.rawValue,
-                                    isSelected: selectedCategory == category
-                                ) {
-                                    selectedCategory = category
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
+            Group {
+                if isLoading {
+                    ProgressView("Loading attractions...")
+                } else if let error = error {
+                    VStack {
+                        Text("Error loading attractions")
+                            .font(.headline)
+                        Text(error.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding()
                     }
-                    
-                    // Daily itineraries
-                    ForEach(Array(dailyItineraries.enumerated()), id: \.offset) { index, attractions in
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Day \(index + 1)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
-                            
-                            ForEach(attractions) { attraction in
-                                AttractionCard(attraction: attraction)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(0..<numberOfDays, id: \.self) { day in
+                                DayItineraryView(
+                                    dayNumber: day + 1,
+                                    attractions: attractionsForDay(day)
+                                )
                             }
                         }
+                        .padding()
                     }
                 }
-                .padding(.vertical)
             }
             .navigationTitle("\(city.name) Itinerary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Back") {
                         dismiss()
                     }
                 }
+            }
+        }
+        .task {
+            await loadAttractions()
+        }
+    }
+    
+    private func loadAttractions() async {
+        isLoading = true
+        error = nil
+        
+        do {
+            attractions = try await GooglePlacesService.shared.fetchTouristAttractions(for: city)
+        } catch {
+            self.error = error
+            print("Error loading attractions: \(error)")
+        }
+        
+        isLoading = false
+    }
+    
+    private func attractionsForDay(_ day: Int) -> [TouristAttraction] {
+        let attractionsPerDay = max(1, attractions.count / numberOfDays)
+        let startIndex = day * attractionsPerDay
+        let endIndex = min(startIndex + attractionsPerDay, attractions.count)
+        return Array(attractions[startIndex..<endIndex])
+    }
+}
+
+struct DayItineraryView: View {
+    let dayNumber: Int
+    let attractions: [TouristAttraction]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Day \(dayNumber)")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            ForEach(attractions) { attraction in
+                AttractionCard(attraction: attraction)
             }
         }
     }
@@ -191,62 +204,6 @@ struct CategoryButton: View {
                 .foregroundStyle(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
-    }
-}
-
-struct AttractionCard: View {
-    let attraction: TouristAttraction
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: attraction.imageURL)) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                Color.gray.opacity(0.2)
-            }
-            .frame(height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(attraction.name)
-                    .font(.headline)
-                
-                Text(attraction.description)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                HStack {
-                    Label("\(Int(attraction.estimatedDuration)) min", systemImage: "clock")
-                    Spacer()
-                    Text(attraction.category.rawValue)
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundStyle(.blue)
-                        .clipShape(Capsule())
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                
-                if !attraction.tips.isEmpty {
-                    Text("Tips:")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                    ForEach(attraction.tips, id: \.self) { tip in
-                        Text("• \(tip)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.horizontal)
-        }
-        .background(Color.gray.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
     }
 }
 

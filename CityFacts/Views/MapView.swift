@@ -4,10 +4,16 @@ import MapKit
 struct MapView: View {
     @EnvironmentObject private var cityStore: CityStore
     @State private var selectedCity: City?
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-        span: MKCoordinateSpan(latitudeDelta: 180, longitudeDelta: 180)
-    )
+    @State private var region: MKCoordinateRegion
+    let initialCity: City?
+    
+    init(initialCity: City? = nil) {
+        self.initialCity = initialCity
+        _region = State(initialValue: MKCoordinateRegion(
+            center: initialCity?.location ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            span: MKCoordinateSpan(latitudeDelta: initialCity != nil ? 0.1 : 180, longitudeDelta: initialCity != nil ? 0.1 : 180)
+        ))
+    }
     
     var body: some View {
         NavigationStack {
