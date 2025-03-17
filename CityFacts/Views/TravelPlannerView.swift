@@ -101,6 +101,7 @@ struct ItineraryView: View {
     let city: City
     let numberOfDays: Int
     @State private var attractions: [TouristAttraction] = []
+    @State private var selectedHotel: Hotel?
     @State private var isLoading = true
     @State private var error: Error?
     @Environment(\.dismiss) private var dismiss
@@ -116,17 +117,19 @@ struct ItineraryView: View {
                             .font(.headline)
                         Text(error.localizedDescription)
                             .font(.subheadline)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                             .multilineTextAlignment(.center)
                             .padding()
                     }
-                } else {
+                } else if let hotel = selectedHotel {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             ForEach(0..<numberOfDays, id: \.self) { day in
                                 DayItineraryView(
                                     dayNumber: day + 1,
-                                    attractions: attractionsForDay(day)
+                                    attractions: attractionsForDay(day),
+                                    city: city,
+                                    selectedHotel: $selectedHotel
                                 )
                             }
                         }
@@ -145,19 +148,24 @@ struct ItineraryView: View {
             }
         }
         .task {
-            await loadAttractions()
+            await loadData()
         }
     }
     
-    private func loadAttractions() async {
+    private func loadData() async {
         isLoading = true
         error = nil
         
         do {
-            attractions = try await GooglePlacesService.shared.fetchTouristAttractions(for: city)
+            async let attractionsTask = GooglePlacesService.shared.fetchTouristAttractions(for: city)
+            async let hotelTask = GooglePlacesService.shared.findBestHotel(in: city)
+            
+            let (fetchedAttractions, fetchedHotel) = try await (attractionsTask, hotelTask)
+            self.attractions = fetchedAttractions
+            self.selectedHotel = fetchedHotel
         } catch {
             self.error = error
-            print("Error loading attractions: \(error)")
+            print("Error loading data: \(error)")
         }
         
         isLoading = false
@@ -174,6 +182,9 @@ struct ItineraryView: View {
 struct DayItineraryView: View {
     let dayNumber: Int
     let attractions: [TouristAttraction]
+    let city: City
+    @Binding var selectedHotel: Hotel?
+    @State private var showingHotelDetails = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -183,6 +194,60 @@ struct DayItineraryView: View {
             
             ForEach(attractions) { attraction in
                 AttractionCard(attraction: attraction)
+            }
+            
+            if let hotel = selectedHotel {
+                // Hotel Card
+                Button {
+                    showingHotelDetails = true
+                } label: {
+                    HStack(spacing: 16) {
+                        AsyncImage(url: URL(string: hotel.imageURL)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.gray
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Your Hotel")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text(hotel.name)
+                                .font(.headline)
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .foregroundStyle(.yellow)
+                                Text(String(format: "%.1f", hotel.rating))
+                                Text("•")
+                                Text(hotel.priceLevel.rawValue)
+                            }
+                            .font(.subheadline)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(radius: 2)
+                }
+                .buttonStyle(.plain)
+                .sheet(isPresented: $showingHotelDetails) {
+                    NavigationStack {
+                        HotelDetailView(
+                            hotel: hotel,
+                            city: city,
+                            selectedHotel: $selectedHotel
+                        )
+                    }
+                }
             }
         }
     }

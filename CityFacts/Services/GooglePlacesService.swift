@@ -10,15 +10,32 @@ class GooglePlacesService {
     func searchPlaces(query: String, type: String? = nil) async throws -> [Place] {
         print("\n=== Starting searchPlaces ===")
         print("Query: \(query)")
-        let endpoint = GooglePlacesConfig.searchEndpoint
         
+        // Construct URL using URLComponents with base URL
+        let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.searchEndpoint
+        guard var urlComponents = URLComponents(string: fullEndpoint) else {
+            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+            throw NetworkError.invalidURL
+        }
+        
+        // Add the API key as a query parameter
+        urlComponents.queryItems = [
+            URLQueryItem(name: "key", value: GooglePlacesConfig.apiKey)
+        ]
+        
+        guard let url = urlComponents.url else {
+            print("❌ Failed to create URL from components")
+            throw NetworkError.invalidURL
+        }
+        
+        // Create request body with text query and type
         var requestBody: [String: Any] = [
             "textQuery": query
         ]
         
-        guard let url = GooglePlacesConfig.buildURL(endpoint: endpoint) else {
-            print("❌ Failed to build URL for endpoint: \(endpoint)")
-            throw NetworkError.invalidURL
+        // Add locationBias if searching for hotels
+        if query.lowercased().contains("hotel") {
+            requestBody["includedType"] = "lodging"
         }
         
         var request = URLRequest(url: url)
@@ -27,7 +44,7 @@ class GooglePlacesService {
         // Set headers
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("places.id,places.displayName,places.formattedAddress,places.location,places.types,places.photos.name,places.photos.widthPx,places.photos.heightPx,places.primaryType,places.primaryTypeDisplayName", forHTTPHeaderField: "X-Goog-FieldMask")
+        request.setValue("places.id,places.displayName,places.formattedAddress,places.location,places.types,places.photos,places.primaryType,places.primaryTypeDisplayName,places.websiteUri,places.rating,places.priceLevel", forHTTPHeaderField: "X-Goog-FieldMask")
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -135,7 +152,22 @@ class GooglePlacesService {
     
     // Get nearby places
     func getNearbyPlaces(location: CLLocationCoordinate2D, radius: Int = 5000, types: [String]? = nil) async throws -> [Place] {
-        let endpoint = GooglePlacesConfig.nearbyEndpoint
+        // Construct URL using URLComponents with base URL
+        let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.nearbyEndpoint
+        guard var urlComponents = URLComponents(string: fullEndpoint) else {
+            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+            throw NetworkError.invalidURL
+        }
+        
+        // Add the API key as a query parameter
+        urlComponents.queryItems = [
+            URLQueryItem(name: "key", value: GooglePlacesConfig.apiKey)
+        ]
+        
+        guard let url = urlComponents.url else {
+            print("❌ Failed to create URL from components")
+            throw NetworkError.invalidURL
+        }
         
         var requestBody: [String: Any] = [
             "locationRestriction": [
@@ -149,17 +181,13 @@ class GooglePlacesService {
             ]
         ]
         
-        guard let url = GooglePlacesConfig.buildURL(endpoint: endpoint) else {
-            throw NetworkError.invalidURL
-        }
-        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         
         // Set headers
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("places.id,places.displayName,places.formattedAddress,places.location,places.types,places.photos.name,places.photos.widthPx,places.photos.heightPx,places.primaryType,places.primaryTypeDisplayName", forHTTPHeaderField: "X-Goog-FieldMask")
+        request.setValue("id,displayName,formattedAddress,location,types,photos.name,photos.widthPx,photos.heightPx,primaryType,primaryTypeDisplayName,websiteUri", forHTTPHeaderField: "X-Goog-FieldMask")
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -207,21 +235,39 @@ class GooglePlacesService {
     
     // Get place details
     func getPlaceDetails(placeId: String) async throws -> PlaceDetails {
-        let endpoint = "\(GooglePlacesConfig.detailsEndpoint)/\(placeId)"
+        // Construct URL using URLComponents with base URL
+        let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.detailsEndpoint + "/" + placeId
+        guard var urlComponents = URLComponents(string: fullEndpoint) else {
+            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+            throw NetworkError.invalidURL
+        }
         
-        guard let url = GooglePlacesConfig.buildURL(endpoint: endpoint) else {
+        // Add the API key as a query parameter
+        urlComponents.queryItems = [
+            URLQueryItem(name: "key", value: GooglePlacesConfig.apiKey)
+        ]
+        
+        guard let url = urlComponents.url else {
+            print("❌ Failed to create URL from components")
             throw NetworkError.invalidURL
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("places.id,places.displayName,places.formattedAddress,places.location,places.types,places.photos.name,places.photos.widthPx,places.photos.heightPx,places.primaryType,places.primaryTypeDisplayName", forHTTPHeaderField: "X-Goog-FieldMask")
+        request.setValue("id,displayName,formattedAddress,location,types,photos.name,photos.widthPx,photos.heightPx,primaryType,primaryTypeDisplayName,websiteUri", forHTTPHeaderField: "X-Goog-FieldMask")
         
         print("Fetching place details with URL: \(url)")
         let (data, response) = try await URLSession.shared.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
+            print("HTTP Status Code: \(httpResponse.statusCode)")
+            print("Response headers: \(httpResponse.allHeaderFields)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Raw response data: \(responseString)")
+            }
+            
             if httpResponse.statusCode != 200 {
                 if let errorString = String(data: data, encoding: .utf8) {
                     throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode): \(errorString)")
@@ -495,6 +541,54 @@ class GooglePlacesService {
         
         // Default category
         return .historical
+    }
+    
+    // Find the best hotel in a city
+    func findBestHotel(in city: City) async throws -> Hotel {
+        print("\n=== Finding Best Hotel in \(city.name) ===")
+        
+        let searchQuery = "best luxury hotel in \(city.name)"
+        let places = try await searchPlaces(query: searchQuery)
+        
+        guard let bestHotel = places.first else {
+            throw NetworkError.apiError(message: "No hotels found in \(city.name)")
+        }
+        
+        // Determine price level based on the place's types
+        let priceLevel: Hotel.PriceLevel
+        if bestHotel.types.contains("luxury") {
+            priceLevel = .ultraLuxury
+        } else if bestHotel.types.contains("upscale") {
+            priceLevel = .luxury
+        } else if bestHotel.types.contains("budget") {
+            priceLevel = .budget
+        } else {
+            priceLevel = .moderate
+        }
+        
+        // Get amenities based on place types
+        var amenities = ["Wi-Fi", "Air Conditioning"]
+        if bestHotel.types.contains("spa") { amenities.append("Spa") }
+        if bestHotel.types.contains("restaurant") { amenities.append("Restaurant") }
+        if bestHotel.types.contains("fitness_center") { amenities.append("Fitness Center") }
+        if bestHotel.types.contains("swimming_pool") { amenities.append("Swimming Pool") }
+        
+        return Hotel(
+            id: UUID(),
+            name: bestHotel.displayName.text,
+            description: "Experience luxury and comfort at \(bestHotel.displayName.text), one of \(city.name)'s finest hotels.",
+            address: bestHotel.formattedAddress,
+            rating: 4.5, // Default rating since Places API New doesn't provide ratings directly
+            imageURL: bestHotel.photos?.first?.photoURL ?? "https://images.unsplash.com/photo-1566073771259-6a8506099945",
+            coordinates: CLLocationCoordinate2D(
+                latitude: bestHotel.location.latitude,
+                longitude: bestHotel.location.longitude
+            ),
+            amenities: amenities,
+            websiteURL: nil,
+            phoneNumber: nil,
+            priceLevel: priceLevel
+        )
     }
 }
 
