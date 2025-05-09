@@ -7,6 +7,8 @@ struct CityDetailView: View {
     @State private var selectedTab = 0
     @State private var region: MKCoordinateRegion
     @State private var showingMap = false
+    @State private var showingRoute = false
+    @State private var userLocation: CLLocationCoordinate2D?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     init(city: City) {
@@ -30,6 +32,24 @@ struct CityDetailView: View {
                             landmarksSection
                         }
                         .padding()
+                        
+                        // Add Route Button
+                        Button(action: {
+                            showingRoute = true
+                        }) {
+                            HStack {
+                                Image(systemName: "map.fill")
+                                Text("Show Route")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                        .padding(.horizontal)
+                        .disabled(userLocation == nil)
+                        .opacity(userLocation == nil ? 0.6 : 1)
                     }
                 }
             } else {
@@ -95,6 +115,29 @@ struct CityDetailView: View {
                         }
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showingRoute) {
+            if let userLocation = userLocation {
+                NavigationView {
+                    RouteView(
+                        origin: userLocation,
+                        destination: CLLocationCoordinate2D(
+                            latitude: city.coordinates.latitude,
+                            longitude: city.coordinates.longitude
+                        ),
+                        city: city
+                    )
+                }
+            }
+        }
+        .task {
+            // Request location permission and get user's location
+            let locationManager = CLLocationManager()
+            locationManager.requestWhenInUseAuthorization()
+            
+            if let location = locationManager.location?.coordinate {
+                userLocation = location
             }
         }
     }

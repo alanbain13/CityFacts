@@ -7,6 +7,8 @@
 	<key>NSLocationUsageDescription</key>
 	<string>We need your location to show your position relative to cities on the map.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to show your position relative to cities on the map.</string>
+	<string>We need your location to show you the route to your destination city.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to show you the route to your destination city.</string>
 </dict>
 </plist>

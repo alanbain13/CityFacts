@@ -1,0 +1,213 @@
+/// AttractionListView.swift
+/// A view that displays a list of attractions for a given city.
+/// This view handles loading, displaying, and selecting attractions,
+/// as well as showing detailed information about each attraction.
+
+import SwiftUI
+import CoreLocation
+
+/// A view that presents a list of attractions with their basic information
+/// and provides navigation to detailed views.
+struct AttractionListView: View {
+    /// Dismiss action for the view
+    @Environment(\.dismiss) private var dismiss
+    
+    /// The currently selected attraction, bound to the parent view
+    @Binding var selectedAttraction: Attraction?
+    
+    /// The city for which to display attractions
+    let city: City
+    
+    /// Array of loaded attractions
+    @State private var attractions: [Attraction] = []
+    
+    /// Loading state indicator
+    @State private var isLoading = true
+    
+    /// Error state for attraction loading failures
+    @State private var error: Error?
+    
+    /// The attraction selected for detailed view
+    @State private var selectedAttractionForDetails: Attraction?
+    
+    /// Controls the presentation of the attraction details sheet
+    @State private var showingAttractionDetails = false
+    
+    /// The main view body displaying a list of attractions with loading, error,
+    /// and empty states handled appropriately.
+    /// 
+    /// This view provides:
+    /// - Loading indicator while fetching attractions
+    /// - Error view with retry option if loading fails
+    /// - Empty state message if no attractions found
+    /// - Scrollable list of attractions when loaded
+    /// - Navigation title showing the city name
+    /// - Cancel button to dismiss the view
+    /// - Detail view presentation when an attraction is selected
+    var body: some View {
+        NavigationView {
+            mainContent
+                .navigationTitle("Attractions in \(city.name)")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+                }
+                .sheet(isPresented: $showingAttractionDetails) {
+                    if let attraction = selectedAttractionForDetails {
+                        attractionDetailsSheet(for: attraction)
+                    }
+                }
+        }
+        .task {
+            await loadAttractions()
+        }
+    }
+    
+    private var mainContent: some View {
+        Group {
+            if isLoading {
+                loadingView
+            } else if let error = error {
+                errorView(error: error)
+            } else if attractions.isEmpty {
+                emptyView
+            } else {
+                attractionsList
+            }
+        }
+    }
+    
+    private var loadingView: some View {
+        ProgressView("Loading attractions...")
+    }
+    
+    private var emptyView: some View {
+        Text("No attractions found")
+            .foregroundStyle(.secondary)
+    }
+    
+    private func errorView(error: Error) -> some View {
+        VStack(spacing: 16) {
+            Text("Error loading attractions")
+                .font(.headline)
+                .foregroundStyle(.red)
+            Text(error.localizedDescription)
+                .font(.subheadline)
+                .foregroundStyle(.red)
+                .multilineTextAlignment(.center)
+            Button("Try Again") {
+                Task {
+                    await loadAttractions()
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+    }
+    
+    private var attractionsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(attractions) { attraction in
+                    attractionRow(for: attraction)
+                }
+            }
+            .padding()
+        }
+    }
+    
+    private func attractionRow(for attraction: Attraction) -> some View {
+        AttractionRow(
+            attraction: attraction,
+            isSelected: attraction.id == selectedAttraction?.id,
+            onSelect: {
+                selectedAttractionForDetails = attraction
+                showingAttractionDetails = true
+            }
+        )
+    }
+    
+    private func attractionDetailsSheet(for attraction: Attraction) -> some View {
+        NavigationView {
+            AttractionDetailView(attraction: attraction)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            showingAttractionDetails = false
+                        }
+                    }
+                }
+        }
+    }
+    
+    /// Asynchronously loads attractions for the current city using the Google Places API.
+    /// 
+    /// This function:
+    /// - Sets loading state to true and clears any previous errors
+    /// - Converts city coordinates to CLLocationCoordinate2D format
+    /// - Fetches nearby tourist attractions using the Google Places API
+    /// - Maps the API response to Attraction models
+    /// - Updates the attractions array with the results
+    /// - Handles any errors that occur during the process
+    /// - Sets loading state to false when complete
+    ///
+    /// The function uses default values for rating (0.0) and price level (moderate)
+    /// when this information is not available from the Places API.
+    private func loadAttractions() async {
+        print("Starting to load attractions for \(city.name)")
+        isLoading = true
+        error = nil
+        
+        do {
+            print("Converting coordinates for \(city.name)")
+            let cityCoordinates = CLLocationCoordinate2D(
+                latitude: city.coordinates.latitude,
+                longitude: city.coordinates.longitude
+            )
+            
+            print("Fetching places from Google Places API")
+            let places = try await GooglePlacesService.shared.getNearbyPlaces(
+                location: cityCoordinates,
+                types: ["tourist_attraction"]
+            )
+            
+            print("Found \(places.count) places")
+            
+            attractions = places.map { place in
+                print("Mapping place: \(place.displayName.text)")
+                let coordinates = CLLocationCoordinate2D(
+                    latitude: place.location.latitude,
+                    longitude: place.location.longitude
+                )
+                
+                let attraction = Attraction(
+                    id: place.id,
+                    name: place.displayName.text,
+                    description: place.primaryTypeDisplayName?.text ?? place.displayName.text,
+                    address: place.formattedAddress,
+                    rating: 0.0,
+                    imageURL: place.photos?.first?.uri ?? "",
+                    coordinates: coordinates,
+                    websiteURL: nil,
+                    priceLevel: .moderate
+                )
+                
+                print("Mapped attraction: \(attraction.name)")
+                return attraction
+            }
+            
+            print("Total attractions loaded: \(attractions.count)")
+        } catch {
+            print("Error loading attractions: \(error.localizedDescription)")
+            self.error = error
+        }
+        
+        isLoading = false
+        print("Finished loading attractions")
+    }
+} 

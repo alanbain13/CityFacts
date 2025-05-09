@@ -181,6 +181,11 @@ class GooglePlacesService {
             ]
         ]
         
+        // Add includedTypes if specified
+        if let types = types {
+            requestBody["includedTypes"] = types
+        }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         
@@ -590,6 +595,89 @@ class GooglePlacesService {
             priceLevel: priceLevel
         )
     }
+    
+    // Add this enum before the searchCities method
+    enum GooglePlacesError: Error {
+        case invalidURL
+        case invalidResponse
+        case decodingError
+    }
+    
+    /// Searches for cities using the Google Places API
+    /// - Parameter query: The search query for the city
+    /// - Returns: An array of City objects matching the search query
+    func searchCities(query: String) async throws -> [City] {
+        print("\n=== Starting searchCities ===")
+        print("Query: \(query)")
+        
+        let places = try await searchPlaces(query: query)
+        
+        // Filter places to only include cities and convert them to City objects
+        let cities = places.compactMap { place -> City? in
+            // Check if the place is a city (locality or administrative_area_level_1)
+            guard place.types.contains("locality") || place.types.contains("administrative_area_level_1") else {
+                return nil
+            }
+            
+            let country = place.formattedAddress.components(separatedBy: ",").last?.trimmingCharacters(in: .whitespaces) ?? ""
+            
+            // Create a City object
+            return City(
+                id: UUID(),
+                name: place.displayName.text,
+                country: country,
+                continent: determineContinent(from: country),
+                population: 0, // This would need to be fetched from another API
+                description: "",
+                landmarks: [],
+                coordinates: City.Coordinates(latitude: place.location.latitude, longitude: place.location.longitude),
+                timezone: "", // This would need to be determined based on coordinates
+                imageURLs: place.photos?.compactMap { $0.photoURL } ?? [],
+                facts: []
+            )
+        }
+        
+        print("Found \(cities.count) cities")
+        return cities
+    }
+    
+    // Helper function to determine continent from country
+    private func determineContinent(from country: String) -> CityStore.Continent {
+        let lowercasedCountry = country.lowercased()
+        
+        // North America
+        if ["united states", "canada", "mexico", "usa", "us"].contains(where: { lowercasedCountry.contains($0) }) {
+            return .northAmerica
+        }
+        
+        // South America
+        if ["brazil", "argentina", "chile", "peru", "colombia", "venezuela"].contains(where: { lowercasedCountry.contains($0) }) {
+            return .southAmerica
+        }
+        
+        // Europe
+        if ["france", "germany", "italy", "spain", "uk", "united kingdom", "netherlands", "switzerland", "sweden", "norway", "denmark", "finland", "austria", "belgium", "portugal", "greece", "ireland", "poland", "czech", "hungary"].contains(where: { lowercasedCountry.contains($0) }) {
+            return .europe
+        }
+        
+        // Asia
+        if ["china", "japan", "india", "korea", "thailand", "vietnam", "malaysia", "singapore", "indonesia", "philippines", "taiwan", "hong kong", "turkey", "israel", "uae", "saudi arabia", "qatar"].contains(where: { lowercasedCountry.contains($0) }) {
+            return .asia
+        }
+        
+        // Africa
+        if ["south africa", "egypt", "morocco", "nigeria", "kenya", "ethiopia", "ghana", "tanzania", "uganda"].contains(where: { lowercasedCountry.contains($0) }) {
+            return .africa
+        }
+        
+        // Oceania
+        if ["australia", "new zealand", "fiji", "samoa", "tonga"].contains(where: { lowercasedCountry.contains($0) }) {
+            return .oceania
+        }
+        
+        // Default to Europe if we can't determine
+        return .europe
+    }
 }
 
 // Response models for Places API (New)
@@ -727,4 +815,19 @@ struct Period: Codable {
 struct Time: Codable {
     let day: Int
     let time: String
+}
+
+// Add this structure for decoding the autocomplete response
+struct PlacesAutocompleteResponse: Codable {
+    let predictions: [Prediction]
+    
+    struct Prediction: Codable {
+        let description: String
+        let placeId: String
+        
+        enum CodingKeys: String, CodingKey {
+            case description
+            case placeId = "place_id"
+        }
+    }
 } 

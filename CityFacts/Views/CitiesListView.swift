@@ -4,6 +4,7 @@ struct CitiesListView: View {
     @EnvironmentObject private var cityStore: CityStore
     @State private var showingFilters = false
     @State private var selectedCity: City?
+    @State private var showingCitySearch = false
     
     var body: some View {
         List {
@@ -35,6 +36,14 @@ struct CitiesListView: View {
                 }
             }
             
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingCitySearch = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+            
             ToolbarItem(placement: .topBarLeading) {
                 NavigationLink {
                     MapView()
@@ -51,6 +60,9 @@ struct CitiesListView: View {
             NavigationStack {
                 MapView(initialCity: city)
             }
+        }
+        .sheet(isPresented: $showingCitySearch) {
+            CitySearchView(selectedCity: $selectedCity)
         }
     }
 }

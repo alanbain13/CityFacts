@@ -3,6 +3,8 @@ import SwiftUI
 struct HomeView: View {
     @State private var selectedTab = 0
     @State private var isAnimating = false
+    @State private var showingCitySearch = false
+    @State private var selectedCity: City?
     
     var body: some View {
         NavigationStack {
@@ -80,6 +82,16 @@ struct HomeView: View {
                             )
                         }
                         
+                        Button {
+                            showingCitySearch = true
+                        } label: {
+                            NavigationButton(
+                                title: "Search Any City",
+                                systemImage: "magnifyingglass",
+                                color: .purple
+                            )
+                        }
+                        
                         NavigationLink {
                             TravelPlannerView()
                         } label: {
@@ -106,6 +118,9 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 isAnimating = true
+            }
+            .sheet(isPresented: $showingCitySearch) {
+                CitySearchView(selectedCity: $selectedCity)
             }
         }
     }

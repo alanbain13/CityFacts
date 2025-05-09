@@ -9,20 +9,21 @@ struct HotelListView: View {
     @State private var hotels: [Hotel] = []
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var selectedHotelForDetails: Hotel?
+    @State private var showingHotelDetails = false
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             Group {
                 if isLoading {
                     ProgressView("Loading hotels...")
                 } else if let error = error {
-                    VStack(spacing: 16) {
+                    VStack {
                         Text("Error loading hotels")
-                            .font(.headline)
+                            .foregroundColor(.red)
                         Text(error.localizedDescription)
-                            .font(.subheadline)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.center)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         Button("Try Again") {
                             Task {
                                 await loadHotels()
@@ -30,28 +31,48 @@ struct HotelListView: View {
                         }
                         .buttonStyle(.bordered)
                     }
-                    .padding()
+                } else if hotels.isEmpty {
+                    Text("No hotels found")
+                        .foregroundColor(.secondary)
                 } else {
-                    List(hotels) { hotel in
-                        HotelRow(
-                            hotel: hotel,
-                            isSelected: hotel.id == selectedHotel?.id,
-                            onSelect: {
-                                selectedHotel = hotel
-                                dismiss()
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(hotels, id: \.id) { hotel in
+                                HotelRow(hotel: hotel) {
+                                    selectedHotel = hotel
+                                    dismiss()
+                                }
+                                .onTapGesture {
+                                    selectedHotelForDetails = hotel
+                                    showingHotelDetails = true
+                                }
                             }
-                        )
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                        }
+                        .padding()
                     }
                 }
             }
             .navigationTitle("Hotels in \(city.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingHotelDetails) {
+                if let hotel = selectedHotelForDetails {
+                    NavigationView {
+                        HotelDetailView(hotel: hotel, city: city, selectedHotel: $selectedHotel)
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    Button("Done") {
+                                        showingHotelDetails = false
+                                    }
+                                }
+                            }
                     }
                 }
             }
@@ -133,68 +154,83 @@ struct HotelListView: View {
 
 struct HotelRow: View {
     let hotel: Hotel
-    let isSelected: Bool
-    @State private var showingWebsite = false
     let onSelect: () -> Void
+    @State private var showingWebsite = false
     
     var body: some View {
-        HStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
+            // Hotel Image
             AsyncImage(url: URL(string: hotel.imageURL)) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } placeholder: {
-                Color.gray
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
             }
-            .frame(width: 80, height: 80)
+            .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
+            // Hotel Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(hotel.name)
                     .font(.headline)
+                
+                Text(hotel.address)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
                 HStack {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(.yellow)
-                    Text(String(format: "%.1f", hotel.rating))
+                    Text("\(hotel.rating, specifier: "%.1f")")
+                        .foregroundColor(.yellow)
                     Text("•")
+                        .foregroundColor(.secondary)
                     Text(hotel.priceLevel.rawValue)
+                        .foregroundColor(.secondary)
                 }
                 .font(.subheadline)
-                Text(hotel.address)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            }
+            .padding(.horizontal, 4)
+            
+            // Action Buttons
+            HStack(spacing: 12) {
+                Button(action: onSelect) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Select Hotel")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
                 
-                if hotel.websiteURL != nil {
-                    Button {
-                        showingWebsite = true
-                    } label: {
+                if let websiteURL = hotel.websiteURL {
+                    Button(action: { showingWebsite = true }) {
                         HStack {
                             Image(systemName: "globe")
-                            Text("Visit Website")
-                                .font(.caption)
+                            Text("Website")
                         }
-                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
                     }
                 }
             }
-            
-            Spacer()
-            
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(.blue)
-            }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
-        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 2)
         .sheet(isPresented: $showingWebsite) {
-            if let websiteURL = hotel.websiteURL, let url = URL(string: websiteURL) {
-                NavigationStack {
-                    HotelWebView(url: url)
-                        .navigationTitle(hotel.name)
+            if let websiteURLString = hotel.websiteURL,
+               let websiteURL = URL(string: websiteURLString) {
+                NavigationView {
+                    HotelWebView(url: websiteURL)
+                        .navigationTitle("Hotel Website")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .navigationBarTrailing) {
@@ -206,7 +242,6 @@ struct HotelRow: View {
                 }
             }
         }
-        .padding(.vertical, 4)
     }
 }
 
