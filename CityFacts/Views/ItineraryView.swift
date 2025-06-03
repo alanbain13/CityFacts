@@ -1,5 +1,8 @@
 import SwiftUI
 
+// ItineraryView allows users to create and manage their travel itinerary.
+// It displays a list of planned activities, attractions, and events for a selected city.
+// Users can add, edit, or remove items from their itinerary.
 struct ItineraryView: View {
     let city: City
     let startDate: Date
@@ -85,6 +88,9 @@ struct ItineraryView: View {
     }
 }
 
+// DayItineraryView displays a single day's itinerary with morning and afternoon activities.
+// It shows the selected hotel and organizes attractions into time slots.
+// The view allows users to view hotel details and manage their daily schedule.
 struct DayItineraryView: View {
     let dayNumber: Int
     let attractions: [TouristAttraction]

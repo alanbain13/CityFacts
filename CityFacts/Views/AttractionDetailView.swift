@@ -2,6 +2,9 @@ import SwiftUI
 import MapKit
 import SafariServices
 
+// AttractionDetailView displays detailed information about a selected attraction.
+// It shows the attraction's name, description, images, and location on a map.
+// Users can view additional details such as opening hours, admission fees, and reviews.
 struct AttractionDetailView: View {
     let attraction: Attraction
     @Environment(\.dismiss) private var dismiss

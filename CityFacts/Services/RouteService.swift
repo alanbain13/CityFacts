@@ -6,6 +6,14 @@ class RouteService {
     
     private init() {}
     
+    // Add enum for travel modes
+    enum TravelMode: String, Codable {
+        case driving = "DRIVE"
+        case walking = "WALK"
+        case bicycling = "BICYCLE"
+        case transit = "TRANSIT"
+    }
+    
     struct RouteResponse: Codable {
         let routes: [Route]
     }
@@ -24,15 +32,24 @@ class RouteService {
     struct Leg: Codable {
         let distanceMeters: Int
         let duration: String
-        let startLocation: Location
-        let endLocation: Location
+        let startLocation: RouteLocation
+        let endLocation: RouteLocation
         let steps: [Step]
+    }
+    
+    struct RouteLocation: Codable {
+        let latLng: LatLng
+    }
+    
+    struct LatLng: Codable {
+        let latitude: Double
+        let longitude: Double
     }
     
     struct Step: Codable {
         let distanceMeters: Int
-        let duration: String
-        let navigationInstruction: NavigationInstruction
+        let staticDuration: String
+        let navigationInstruction: NavigationInstruction?
         let polyline: Polyline
     }
     
@@ -41,20 +58,16 @@ class RouteService {
         let instructions: String
     }
     
-    struct Location: Codable {
-        let latitude: Double
-        let longitude: Double
-    }
-    
-    func getRoute(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> Route {
+    func getRoute(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, travelMode: TravelMode = .driving) async throws -> Route {
         print("\n=== Getting Route ===")
         print("From: \(origin.latitude), \(origin.longitude)")
         print("To: \(destination.latitude), \(destination.longitude)")
+        print("Travel Mode: \(travelMode.rawValue)")
         
-        // Construct URL using URLComponents with base URL
-        let fullEndpoint = GooglePlacesConfig.baseURL + "/routes/v2:computeRoutes"
-        guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+        // Use the Routes API base URL
+        let baseURL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+        guard var urlComponents = URLComponents(string: baseURL) else {
+            print("❌ Failed to create URL components for endpoint: \(baseURL)")
             throw NetworkError.invalidURL
         }
         
@@ -86,7 +99,7 @@ class RouteService {
                     ]
                 ]
             ],
-            "travelMode": "DRIVING",
+            "travelMode": travelMode.rawValue,
             "routingPreference": "TRAFFIC_AWARE",
             "computeAlternativeRoutes": false,
             "routeModifiers": [
@@ -103,7 +116,7 @@ class RouteService {
         // Set headers
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.legs.distanceMeters,routes.legs.duration,routes.legs.startLocation,routes.legs.endLocation,routes.legs.steps.distanceMeters,routes.legs.steps.duration,routes.legs.steps.navigationInstruction,routes.legs.steps.polyline", forHTTPHeaderField: "X-Goog-FieldMask")
+        request.setValue("routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.legs.distanceMeters,routes.legs.duration,routes.legs.startLocation,routes.legs.endLocation,routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.polyline", forHTTPHeaderField: "X-Goog-FieldMask")
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)

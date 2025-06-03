@@ -1,5 +1,8 @@
 import SwiftUI
 
+// HomeView serves as the main landing page of the app.
+// It displays featured cities, recent searches, and quick access to travel planning tools.
+// Users can navigate to other views like CitiesListView, TravelPlannerView, or FavoritesView.
 struct HomeView: View {
     @State private var selectedTab = 0
     @State private var isAnimating = false
@@ -153,6 +156,9 @@ struct NavigationButton: View {
     }
 }
 
+// StatView displays a single statistic with a number and label.
+// It uses a frosted glass effect background and is designed for displaying app statistics.
+// The view is commonly used in the home screen to show key metrics.
 struct StatView: View {
     let number: String
     let label: String

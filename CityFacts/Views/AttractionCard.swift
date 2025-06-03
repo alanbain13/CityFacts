@@ -1,5 +1,8 @@
 import SwiftUI
 
+// AttractionCard displays a card view for a single attraction.
+// It shows the attraction's image, name, and a brief description.
+// Users can tap the card to view detailed information about the attraction.
 struct AttractionCard: View {
     let attraction: TouristAttraction
     @State private var showingDetails = false

@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
 
+// RouteView displays a map with a route between two locations (origin and destination).
+// It fetches the route data from the RouteService and renders the route as a polyline on the map.
+// The view also shows route details such as distance, duration, and step-by-step directions.
 struct RouteView: View {
     let origin: CLLocationCoordinate2D
     let destination: CLLocationCoordinate2D
@@ -10,6 +13,7 @@ struct RouteView: View {
     @State private var isLoading = false
     @State private var error: Error?
     @State private var region: MKCoordinateRegion
+    @State private var selectedTransportMode: RouteService.TravelMode = .driving
     
     init(origin: CLLocationCoordinate2D, destination: CLLocationCoordinate2D, city: City) {
         self.origin = origin
@@ -53,7 +57,25 @@ struct RouteView: View {
                     ]) { location in
                         MapMarker(coordinate: location.coordinate, tint: location.title == "Start" ? .blue : .red)
                     }
+                    .overlay(
+                        MapPolyline(encodedPolyline: route.polyline.encodedPolyline)
+                            .stroke(.blue, lineWidth: 4)
+                    )
                     .frame(height: 300)
+                    
+                    Picker("Transport Mode", selection: $selectedTransportMode) {
+                        Text("Driving").tag(RouteService.TravelMode.driving)
+                        Text("Walking").tag(RouteService.TravelMode.walking)
+                        Text("Bicycling").tag(RouteService.TravelMode.bicycling)
+                        Text("Transit").tag(RouteService.TravelMode.transit)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding()
+                    .onChange(of: selectedTransportMode) { _ in
+                        Task {
+                            await loadRoute()
+                        }
+                    }
                     
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
@@ -73,7 +95,7 @@ struct RouteView: View {
                                 .font(.headline)
                                 .padding(.horizontal)
                             
-                            ForEach(route.legs.first?.steps ?? [], id: \.navigationInstruction.instructions) { step in
+                            ForEach(route.legs.first?.steps ?? [], id: \.polyline.encodedPolyline) { step in
                                 DirectionStepView(step: step)
                             }
                         }
@@ -93,7 +115,7 @@ struct RouteView: View {
         error = nil
         
         do {
-            route = try await RouteService.shared.getRoute(from: origin, to: destination)
+            route = try await RouteService.shared.getRoute(from: origin, to: destination, travelMode: selectedTransportMode)
         } catch {
             self.error = error
         }
@@ -145,10 +167,15 @@ struct DirectionStepView: View {
                 .font(.title3)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(step.navigationInstruction.instructions)
-                    .font(.subheadline)
+                if let instruction = step.navigationInstruction {
+                    Text(instruction.instructions)
+                        .font(.subheadline)
+                } else {
+                    Text("Continue")
+                        .font(.subheadline)
+                }
                 
-                Text("\(formatDistance(step.distanceMeters)) • \(step.duration)")
+                Text("\(formatDistance(step.distanceMeters)) • \(step.staticDuration)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -170,6 +197,81 @@ struct MapLocation: Identifiable {
     let coordinate: CLLocationCoordinate2D
     let title: String
     let subtitle: String
+}
+
+struct MapPolyline: Shape {
+    let encodedPolyline: String
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let coordinates = decodePolyline(encodedPolyline)
+        
+        guard let firstCoordinate = coordinates.first else { return path }
+        
+        let startPoint = CGPoint(
+            x: rect.width * CGFloat((firstCoordinate.longitude + 180.0) / 360.0),
+            y: rect.height * CGFloat(1.0 - (firstCoordinate.latitude + 90.0) / 180.0)
+        )
+        
+        path.move(to: startPoint)
+        
+        for coordinate in coordinates.dropFirst() {
+            let point = CGPoint(
+                x: rect.width * CGFloat((coordinate.longitude + 180.0) / 360.0),
+                y: rect.height * CGFloat(1.0 - (coordinate.latitude + 90.0) / 180.0)
+            )
+            path.addLine(to: point)
+        }
+        
+        return path
+    }
+    
+    private func decodePolyline(_ encodedPolyline: String) -> [CLLocationCoordinate2D] {
+        var coordinates: [CLLocationCoordinate2D] = []
+        var index = encodedPolyline.startIndex
+        var lat = 0.0
+        var lng = 0.0
+        
+        while index < encodedPolyline.endIndex {
+            // Decode latitude
+            var shift = 0
+            var result = 0
+            
+            while index < encodedPolyline.endIndex {
+                guard let byte = encodedPolyline[index].asciiValue else { break }
+                let value = Int(byte) - 63
+                result |= (value & 0x1F) << shift
+                shift += 5
+                index = encodedPolyline.index(after: index)
+                
+                if value < 0x20 { break }
+            }
+            
+            let latValue = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1))
+            lat += Double(latValue)
+            
+            // Decode longitude
+            shift = 0
+            result = 0
+            
+            while index < encodedPolyline.endIndex {
+                guard let byte = encodedPolyline[index].asciiValue else { break }
+                let value = Int(byte) - 63
+                result |= (value & 0x1F) << shift
+                shift += 5
+                index = encodedPolyline.index(after: index)
+                
+                if value < 0x20 { break }
+            }
+            
+            let lngValue = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1))
+            lng += Double(lngValue)
+            
+            coordinates.append(CLLocationCoordinate2D(latitude: lat * 1e-5, longitude: lng * 1e-5))
+        }
+        
+        return coordinates
+    }
 }
 
 #Preview {

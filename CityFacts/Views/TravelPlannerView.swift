@@ -1,18 +1,47 @@
 import SwiftUI
 import MapKit
 
+// TravelPlannerView allows users to plan their travel by selecting a destination city.
+// It provides a search interface to find cities and displays a list of available cities.
+// Users can select a city to view detailed information and plan their route.
 struct TravelPlannerView: View {
     @StateObject private var viewModel = TravelPlannerViewModel()
     @State private var selectedCity: City?
+    @State private var homeCity: City?
     @State private var showingCitySearch = false
+    @State private var showingHomeCitySearch = false
     @State private var showingItinerary = false
+    @State private var showingRoute = false
+    @State private var userLocation: CLLocationCoordinate2D?
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                // City selection
+                // Home city selection
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Select a City")
+                    Text("Home City")
+                        .font(.headline)
+                    
+                    Button {
+                        showingHomeCitySearch = true
+                    } label: {
+                        HStack {
+                            Text(homeCity?.name ?? "Select your home city...")
+                                .foregroundColor(homeCity == nil ? .gray : .primary)
+                            Spacer()
+                            Image(systemName: "house.fill")
+                                .foregroundColor(.blue)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Destination city selection
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Destination City")
                         .font(.headline)
                     
                     Button {
@@ -53,6 +82,25 @@ struct TravelPlannerView: View {
                 }
                 .padding(.horizontal)
                 
+                // Route button
+                if let homeCity = homeCity, let selectedCity = selectedCity {
+                    Button {
+                        showingRoute = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "map.fill")
+                            Text("Show Route")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(10)
+                    }
+                    .padding(.horizontal)
+                }
+                
                 // Generate button
                 Button {
                     showingItinerary = true
@@ -75,11 +123,40 @@ struct TravelPlannerView: View {
             .sheet(isPresented: $showingCitySearch) {
                 CitySearchView(selectedCity: $selectedCity)
             }
+            .sheet(isPresented: $showingHomeCitySearch) {
+                CitySearchView(selectedCity: $homeCity)
+            }
             .sheet(isPresented: $showingItinerary) {
                 if let city = selectedCity {
                     NavigationStack {
                         ItineraryView(city: city, startDate: viewModel.startDate, endDate: viewModel.endDate)
                     }
+                }
+            }
+            .sheet(isPresented: $showingRoute) {
+                if let homeCity = homeCity, let selectedCity = selectedCity {
+                    NavigationView {
+                        RouteView(
+                            origin: CLLocationCoordinate2D(
+                                latitude: homeCity.coordinates.latitude,
+                                longitude: homeCity.coordinates.longitude
+                            ),
+                            destination: CLLocationCoordinate2D(
+                                latitude: selectedCity.coordinates.latitude,
+                                longitude: selectedCity.coordinates.longitude
+                            ),
+                            city: selectedCity
+                        )
+                    }
+                }
+            }
+            .task {
+                // Request location permission and get user's location
+                let locationManager = CLLocationManager()
+                locationManager.requestWhenInUseAuthorization()
+                
+                if let location = locationManager.location?.coordinate {
+                    userLocation = location
                 }
             }
         }

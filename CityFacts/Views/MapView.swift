@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
 
+// MapView displays a map with city annotations.
+// Users can tap on a city to view its details and focus the map on selected cities.
+// The view supports navigation to CityDetailView for each city annotation.
 struct MapView: View {
     @EnvironmentObject private var cityStore: CityStore
     @State private var selectedCity: City?

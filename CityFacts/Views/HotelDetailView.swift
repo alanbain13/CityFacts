@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
 
+// HotelDetailView displays detailed information about a selected hotel.
+// It shows the hotel's name, address, rating, amenities, and location on a map.
+// Users can select the hotel, visit its website, or change their hotel selection.
 struct HotelDetailView: View {
     let hotel: Hotel
     let city: City

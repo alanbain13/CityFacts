@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
 
+// CitySearchView provides a search interface for users to find cities.
+// It displays a list of cities matching the search query and allows users to select a city.
+// The view integrates with the CityStore to fetch and display city data.
 struct CitySearchView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = CitySearchViewModel()
@@ -105,6 +108,9 @@ struct CitySearchView: View {
     }
 }
 
+// CitySearchViewModel manages the state and logic for city search functionality.
+// It handles searching for cities using the Google Places service and manages loading states.
+// The view model provides search results and error handling for the CitySearchView.
 class CitySearchViewModel: ObservableObject {
     @Published var searchResults: [City] = []
     @Published var isLoading = false

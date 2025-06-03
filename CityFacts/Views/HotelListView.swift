@@ -2,6 +2,9 @@ import SwiftUI
 import CoreLocation
 import WebKit
 
+// HotelListView displays a list of hotels for a selected city.
+// Users can select a hotel to view details or choose it for their itinerary.
+// The view fetches hotel data and supports navigation to HotelDetailView.
 struct HotelListView: View {
     let city: City
     @Binding var selectedHotel: Hotel?
@@ -245,6 +248,9 @@ struct HotelRow: View {
     }
 }
 
+// HotelWebView is a UIViewRepresentable that displays a hotel's website in a WebKit view.
+// It provides a clean, non-persistent web view for viewing hotel websites within the app.
+// The view supports back/forward navigation gestures and loads the specified URL.
 struct HotelWebView: UIViewRepresentable {
     let url: URL
     

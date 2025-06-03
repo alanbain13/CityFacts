@@ -1,5 +1,8 @@
 import SwiftUI
 
+// ContentView is the main entry point of the app.
+// It provides navigation to browse cities and plan travel, and displays a welcoming background.
+// The view sets up the main navigation structure and environment objects.
 struct ContentView: View {
     @StateObject private var cityStore = CityStore()
     @State private var showingCitiesList = false

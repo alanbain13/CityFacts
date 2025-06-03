@@ -1,5 +1,8 @@
 import SwiftUI
 
+// CitiesListView displays a list of cities available in the app.
+// It allows users to search for cities and filter them by continent or country.
+// Users can select a city to view its details or plan a route.
 struct CitiesListView: View {
     @EnvironmentObject private var cityStore: CityStore
     @State private var showingFilters = false
@@ -67,6 +70,9 @@ struct CitiesListView: View {
     }
 }
 
+// CityRowView displays a single city in a list format.
+// It shows the city name, country, and a star icon if the city is marked as favorite.
+// The view is used in lists and search results throughout the app.
 struct CityRowView: View {
     let city: City
     @EnvironmentObject private var cityStore: CityStore

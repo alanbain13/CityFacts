@@ -6,8 +6,9 @@
 import SwiftUI
 import CoreLocation
 
-/// A view that presents a list of attractions with their basic information
-/// and provides navigation to detailed views.
+/// AttractionListView displays a list of attractions for a selected city.
+/// It allows users to filter attractions by category or search for specific attractions.
+/// Users can select an attraction to view its details or add it to their itinerary.
 struct AttractionListView: View {
     /// Dismiss action for the view
     @Environment(\.dismiss) private var dismiss

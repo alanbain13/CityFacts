@@ -1,5 +1,8 @@
 import SwiftUI
 
+// EmptyStateView displays a customizable empty state message with an icon.
+// It is used to show when there is no content to display, such as no favorites or search results.
+// The view includes a title, system image, and description text.
 struct EmptyStateView: View {
     let title: String
     let systemImage: String
@@ -25,6 +28,9 @@ struct EmptyStateView: View {
     }
 }
 
+// FavoritesView displays a list of cities marked as favorites by the user.
+// Users can view their favorite cities and navigate to detailed city information.
+// If there are no favorites, an empty state view is shown.
 struct FavoritesView: View {
     @EnvironmentObject private var cityStore: CityStore
     

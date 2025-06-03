@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
 
+// CityDetailView displays detailed information about a selected city.
+// It shows the city's name, country, population, description, and a list of landmarks.
+// Users can view images of the city and access additional facts.
 struct CityDetailView: View {
     let city: City
     @EnvironmentObject private var cityStore: CityStore
