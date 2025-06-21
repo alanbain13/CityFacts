@@ -82,7 +82,7 @@ class RouteService {
         }
         
         // Create request body
-        let requestBody: [String: Any] = [
+        var requestBody: [String: Any] = [
             "origin": [
                 "location": [
                     "latLng": [
@@ -100,7 +100,6 @@ class RouteService {
                 ]
             ],
             "travelMode": travelMode.rawValue,
-            "routingPreference": "TRAFFIC_AWARE",
             "computeAlternativeRoutes": false,
             "routeModifiers": [
                 "avoidTolls": false,
@@ -109,6 +108,11 @@ class RouteService {
             "languageCode": "en-US",
             "units": "METRIC"
         ]
+        
+        // Only add routingPreference for driving mode
+        if travelMode == .driving {
+            requestBody["routingPreference"] = "TRAFFIC_AWARE"
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

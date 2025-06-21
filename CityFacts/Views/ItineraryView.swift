@@ -8,52 +8,101 @@ struct ItineraryView: View {
     let startDate: Date
     let endDate: Date
     @State private var attractions: [TouristAttraction] = []
-    @State private var selectedHotel: Hotel?
+    @State private var selectedHotels: [Int: Hotel?] = [:] // Map of day number to optional hotel
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var showingHotelList = false
+    @State private var selectedDayForHotel: Int? = nil
     @Environment(\.dismiss) private var dismiss
     
     private var numberOfDays: Int {
-        Calendar.current.dateComponents([.day], from: startDate, to: endDate).day ?? 1
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: startDate, to: endDate)
+        return (components.day ?? 0) + 1 // Include both start and end dates
+    }
+    
+    private func dateForDay(_ dayIndex: Int) -> Date {
+        let calendar = Calendar.current
+        return calendar.date(byAdding: .day, value: dayIndex, to: startDate) ?? startDate
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
     
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView("Loading attractions...")
-            } else if let error = error {
-                VStack {
-                    Text("Error loading attractions")
-                        .font(.headline)
-                    Text(error.localizedDescription)
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                }
-            } else if let hotel = selectedHotel {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        ForEach(0..<numberOfDays, id: \.self) { day in
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    if isLoading {
+                        ProgressView("Loading attractions...")
+                    } else if let error = error {
+                        Text("Error: \(error.localizedDescription)")
+                            .foregroundColor(.red)
+                    } else if attractions.isEmpty {
+                        Text("No attractions found")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(0..<numberOfDays, id: \.self) { dayIndex in
                             DayItineraryView(
-                                dayNumber: day + 1,
-                                attractions: attractionsForDay(day),
+                                dayNumber: dayIndex + 1,
+                                date: dateForDay(dayIndex),
+                                attractions: attractionsForDay(dayIndex),
                                 city: city,
-                                selectedHotel: $selectedHotel
+                                selectedHotel: selectedHotels[dayIndex + 1] ?? nil,
+                                onHotelSelect: { day in
+                                    selectedDayForHotel = day
+                                    showingHotelList = true
+                                }
                             )
                         }
                     }
-                    .padding()
+                }
+                .padding()
+            }
+            .navigationTitle("\(city.name) Itinerary")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        selectedDayForHotel = nil // Set to nil to indicate default hotel selection
+                        showingHotelList = true
+                    } label: {
+                        Label("Set Default Hotel", systemImage: "bed.double")
+                    }
                 }
             }
         }
-        .navigationTitle("\(city.name) Itinerary")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Back") {
-                    dismiss()
-                }
+        .sheet(isPresented: $showingHotelList) {
+            NavigationStack {
+                HotelListView(
+                    city: city,
+                    selectedHotel: Binding(
+                        get: { 
+                            if let day = selectedDayForHotel {
+                                return selectedHotels[day] ?? nil
+                            }
+                            return nil
+                        },
+                        set: { newHotel in
+                            if let day = selectedDayForHotel {
+                                selectedHotels[day] = newHotel
+                            } else {
+                                // Update default hotel for all days
+                                for day in 1...numberOfDays {
+                                    selectedHotels[day] = newHotel
+                                }
+                            }
+                        }
+                    )
+                )
             }
         }
         .task {
@@ -66,23 +115,41 @@ struct ItineraryView: View {
         error = nil
         
         do {
-            async let attractionsTask = GooglePlacesService.shared.fetchTouristAttractions(for: city)
-            async let hotelTask = GooglePlacesService.shared.findBestHotel(in: city)
+            let fetchedAttractions = try await GooglePlacesService.shared.fetchTouristAttractions(for: city)
+            Logger.success("Fetched \(fetchedAttractions.count) attractions")
             
-            let (fetchedAttractions, fetchedHotel) = try await (attractionsTask, hotelTask)
-            self.attractions = fetchedAttractions
-            self.selectedHotel = fetchedHotel
+            await MainActor.run {
+                self.attractions = fetchedAttractions
+            }
+            
+            do {
+                Logger.info("Fetching default hotel for \(city.name)")
+                let hotel = try await GooglePlacesService.shared.findBestHotel(in: city)
+                await MainActor.run {
+                    // Set the default hotel for all days
+                    for day in 1...numberOfDays {
+                        self.selectedHotels[day] = hotel
+                    }
+                }
+                if let hotel = hotel {
+                    Logger.success("Fetched default hotel: \(hotel.name)")
+                } else {
+                    Logger.warning("No default hotel found")
+                }
+            } catch {
+                Logger.error("Error fetching default hotel: \(error.localizedDescription)")
+            }
         } catch {
+            Logger.error("Error loading attractions: \(error)")
             self.error = error
-            print("Error loading data: \(error)")
         }
         
         isLoading = false
     }
     
-    private func attractionsForDay(_ day: Int) -> [TouristAttraction] {
-        let attractionsPerDay = max(1, attractions.count / numberOfDays)
-        let startIndex = day * attractionsPerDay
+    private func attractionsForDay(_ dayIndex: Int) -> [TouristAttraction] {
+        let attractionsPerDay = Int(ceil(Double(attractions.count) / Double(numberOfDays)))
+        let startIndex = dayIndex * attractionsPerDay
         let endIndex = min(startIndex + attractionsPerDay, attractions.count)
         return Array(attractions[startIndex..<endIndex])
     }
@@ -93,121 +160,164 @@ struct ItineraryView: View {
 // The view allows users to view hotel details and manage their daily schedule.
 struct DayItineraryView: View {
     let dayNumber: Int
+    let date: Date
     let attractions: [TouristAttraction]
     let city: City
-    @Binding var selectedHotel: Hotel?
-    @State private var showingHotelDetails = false
+    let selectedHotel: Hotel?
+    let onHotelSelect: (Int) -> Void
     
-    private var morningAttractions: [TouristAttraction] {
-        var remainingTime = TimeSlot.morningSlot.duration
-        var selected: [TouristAttraction] = []
+    // Cache the calculated attractions
+    private let morningAttractions: [TouristAttraction]
+    private let afternoonAttractions: [TouristAttraction]
+    
+    init(dayNumber: Int, date: Date, attractions: [TouristAttraction], city: City, selectedHotel: Hotel?, onHotelSelect: @escaping (Int) -> Void) {
+        self.dayNumber = dayNumber
+        self.date = date
+        self.attractions = attractions
+        self.city = city
+        self.selectedHotel = selectedHotel
+        self.onHotelSelect = onHotelSelect
+        
+        // Calculate morning attractions
+        var remainingMorningTime = TimeSlot.morningSlot.duration
+        var morningAttractions: [TouristAttraction] = []
         
         for attraction in attractions {
-            if remainingTime >= attraction.estimatedDuration {
-                selected.append(attraction)
-                remainingTime -= attraction.estimatedDuration
+            let attractionDuration = attraction.estimatedDuration * 60
+            if remainingMorningTime >= attractionDuration {
+                morningAttractions.append(attraction)
+                remainingMorningTime -= attractionDuration
+                Logger.debug("Added to morning: \(attraction.name) (\(attraction.estimatedDuration) min)")
             }
         }
+        self.morningAttractions = morningAttractions
         
-        return selected
-    }
-    
-    private var afternoonAttractions: [TouristAttraction] {
-        var remainingTime = TimeSlot.afternoonSlot.duration
-        var selected: [TouristAttraction] = []
+        // Calculate afternoon attractions
+        let remainingAttractions = attractions.filter { !morningAttractions.contains($0) }
+        var remainingAfternoonTime = TimeSlot.afternoonSlot.duration
+        var afternoonAttractions: [TouristAttraction] = []
         
-        for attraction in attractions where !morningAttractions.contains(where: { $0.id == attraction.id }) {
-            if remainingTime >= attraction.estimatedDuration {
-                selected.append(attraction)
-                remainingTime -= attraction.estimatedDuration
+        for attraction in remainingAttractions {
+            let attractionDuration = attraction.estimatedDuration * 60
+            if remainingAfternoonTime >= attractionDuration {
+                afternoonAttractions.append(attraction)
+                remainingAfternoonTime -= attractionDuration
+                Logger.debug("Added to afternoon: \(attraction.name) (\(attraction.estimatedDuration) min)")
             }
         }
-        
-        return selected
+        self.afternoonAttractions = afternoonAttractions
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Day \(dayNumber)")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            // Morning Slot
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Morning (09:00 - 12:00)")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                
-                ForEach(morningAttractions) { attraction in
-                    AttractionCard(attraction: attraction)
-                }
+            // Day Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Day \(dayNumber)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Text(formatDate(date))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
             
-            // Afternoon Slot
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Afternoon (14:00 - 17:00)")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                
-                ForEach(afternoonAttractions) { attraction in
-                    AttractionCard(attraction: attraction)
-                }
-            }
-            
-            if let hotel = selectedHotel {
-                // Hotel Card
-                Button {
-                    showingHotelDetails = true
-                } label: {
-                    HStack(spacing: 16) {
-                        AsyncImage(url: URL(string: hotel.imageURL)) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray
+            // Morning Section
+            if !morningAttractions.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Morning (09:00 - 12:00)")
+                        .font(.headline)
+                    
+                    ForEach(morningAttractions, id: \.id) { attraction in
+                        NavigationLink(destination: AttractionDetailView(attraction: convertAttraction(attraction))) {
+                            AttractionCard(attraction: attraction, timeSlot: .morningSlot)
                         }
-                        .frame(width: 80, height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Your Hotel")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text(hotel.name)
-                                .font(.headline)
-                            HStack {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                                Text(String(format: "%.1f", hotel.rating))
-                                Text("•")
-                                Text(hotel.priceLevel.rawValue)
-                            }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            
+            // Afternoon Section
+            if !afternoonAttractions.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Afternoon (13:00 - 17:00)")
+                        .font(.headline)
+                    
+                    ForEach(afternoonAttractions, id: \.id) { attraction in
+                        NavigationLink(destination: AttractionDetailView(attraction: convertAttraction(attraction))) {
+                            AttractionCard(attraction: attraction, timeSlot: .afternoonSlot)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            
+            // Hotel Section at the end of the day
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Evening Accommodation")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    Button {
+                        onHotelSelect(dayNumber)
+                    } label: {
+                        Text(selectedHotel == nil ? "Select Hotel" : "Change Hotel")
                             .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                if let hotel = selectedHotel {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(hotel.name)
+                            .font(.headline)
+                        if let address = hotel.address {
+                            Text(address)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
                     }
                     .padding()
                     .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .cornerRadius(10)
                     .shadow(radius: 2)
-                }
-                .buttonStyle(.plain)
-                .sheet(isPresented: $showingHotelDetails) {
-                    NavigationStack {
-                        HotelDetailView(
-                            hotel: hotel,
-                            city: city,
-                            selectedHotel: $selectedHotel
-                        )
-                    }
+                } else {
+                    Text("No hotel selected")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
                 }
             }
         }
+        .padding()
+        .background(Color(.systemGroupedBackground))
+        .cornerRadius(16)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+    
+    private func convertAttraction(_ touristAttraction: TouristAttraction) -> Attraction {
+        return Attraction(
+            id: touristAttraction.id.uuidString,
+            name: touristAttraction.name,
+            description: touristAttraction.description,
+            address: "", // TouristAttraction doesn't have address
+            rating: 0.0, // TouristAttraction doesn't have rating
+            imageURL: touristAttraction.imageURL,
+            coordinates: touristAttraction.coordinates.locationCoordinate,
+            websiteURL: touristAttraction.websiteURL,
+            priceLevel: .moderate, // Default to moderate
+            category: Category(rawValue: touristAttraction.category.rawValue) ?? .historical,
+            estimatedDuration: touristAttraction.estimatedDuration,
+            tips: touristAttraction.tips
+        )
     }
 }
 
@@ -239,3 +349,8 @@ struct DayItineraryView: View {
         )
     }
 } 
+
+
+
+
+

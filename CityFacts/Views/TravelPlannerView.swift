@@ -130,7 +130,12 @@ struct TravelPlannerView: View {
                 if let city = selectedCity {
                     NavigationStack {
                         ItineraryView(city: city, startDate: viewModel.startDate, endDate: viewModel.endDate)
+                            .onAppear {
+                                print("[\(Date())] ItineraryView sheet appeared")
+                            }
                     }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
                 }
             }
             .sheet(isPresented: $showingRoute) {
@@ -164,8 +169,24 @@ struct TravelPlannerView: View {
 }
 
 class TravelPlannerViewModel: ObservableObject {
-    @Published var startDate = Date()
-    @Published var endDate = Date().addingTimeInterval(86400 * 3) // 3 days later
+    @Published var startDate: Date = {
+        let calendar = Calendar.current
+        let now = Date()
+        return calendar.startOfDay(for: now)
+    }()
+    
+    @Published var endDate: Date = {
+        let calendar = Calendar.current
+        let now = Date()
+        let threeDaysLater = calendar.date(byAdding: .day, value: 3, to: now) ?? now
+        return calendar.startOfDay(for: threeDaysLater)
+    }()
+    
+    var numberOfDays: Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: startDate, to: endDate)
+        return (components.day ?? 0) + 1 // Include both start and end dates
+    }
 }
 
 #Preview {

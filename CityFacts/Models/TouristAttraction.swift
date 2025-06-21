@@ -1,7 +1,7 @@
 import Foundation
 import CoreLocation
 
-struct TouristAttraction: Identifiable, Codable {
+struct TouristAttraction: Identifiable, Codable, Equatable {
     let id: UUID
     let name: String
     let description: String
@@ -12,7 +12,7 @@ struct TouristAttraction: Identifiable, Codable {
     let tips: [String]
     let websiteURL: String?
     
-    struct Coordinates: Codable {
+    struct Coordinates: Codable, Equatable {
         let latitude: Double
         let longitude: Double
         
@@ -21,7 +21,7 @@ struct TouristAttraction: Identifiable, Codable {
         }
     }
     
-    enum Category: String, Codable, CaseIterable {
+    enum Category: String, Codable, CaseIterable, Equatable {
         case historical = "Historical"
         case cultural = "Cultural"
         case nature = "Nature"
@@ -32,6 +32,10 @@ struct TouristAttraction: Identifiable, Codable {
         case museum = "Museum"
         case park = "Park"
         case architecture = "Architecture"
+    }
+    
+    static func == (lhs: TouristAttraction, rhs: TouristAttraction) -> Bool {
+        lhs.id == rhs.id
     }
 }
 

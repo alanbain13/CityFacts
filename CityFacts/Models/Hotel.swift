@@ -5,14 +5,14 @@ struct Hotel: Identifiable, Codable, Equatable {
     let id: UUID
     let name: String
     let description: String
-    let address: String
-    let rating: Double
-    let imageURL: String
+    let address: String?
+    let rating: Double?
+    let imageURL: String?
     let coordinates: CLLocationCoordinate2D
     let amenities: [String]
     let websiteURL: String?
     let phoneNumber: String?
-    let priceLevel: PriceLevel
+    let priceLevel: PriceLevel?
     
     static func == (lhs: Hotel, rhs: Hotel) -> Bool {
         lhs.id == rhs.id &&
@@ -58,13 +58,13 @@ struct Hotel: Identifiable, Codable, Equatable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         description = try container.decode(String.self, forKey: .description)
-        address = try container.decode(String.self, forKey: .address)
-        rating = try container.decode(Double.self, forKey: .rating)
-        imageURL = try container.decode(String.self, forKey: .imageURL)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        imageURL = try container.decodeIfPresent(String.self, forKey: .imageURL)
         amenities = try container.decode([String].self, forKey: .amenities)
         websiteURL = try container.decodeIfPresent(String.self, forKey: .websiteURL)
         phoneNumber = try container.decodeIfPresent(String.self, forKey: .phoneNumber)
-        priceLevel = try container.decode(PriceLevel.self, forKey: .priceLevel)
+        priceLevel = try container.decodeIfPresent(PriceLevel.self, forKey: .priceLevel)
         
         // Handle coordinates
         if let coordinatesContainer = try? container.nestedContainer(keyedBy: CodingKeys.self, forKey: .coordinates) {
@@ -85,13 +85,13 @@ struct Hotel: Identifiable, Codable, Equatable {
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(description, forKey: .description)
-        try container.encode(address, forKey: .address)
-        try container.encode(rating, forKey: .rating)
-        try container.encode(imageURL, forKey: .imageURL)
+        try container.encodeIfPresent(address, forKey: .address)
+        try container.encodeIfPresent(rating, forKey: .rating)
+        try container.encodeIfPresent(imageURL, forKey: .imageURL)
         try container.encode(amenities, forKey: .amenities)
         try container.encodeIfPresent(websiteURL, forKey: .websiteURL)
         try container.encodeIfPresent(phoneNumber, forKey: .phoneNumber)
-        try container.encode(priceLevel, forKey: .priceLevel)
+        try container.encodeIfPresent(priceLevel, forKey: .priceLevel)
         
         // Encode coordinates as nested container
         var coordinatesContainer = container.nestedContainer(keyedBy: CodingKeys.self, forKey: .coordinates)
@@ -102,14 +102,14 @@ struct Hotel: Identifiable, Codable, Equatable {
     init(id: UUID = UUID(),
          name: String,
          description: String,
-         address: String,
-         rating: Double,
-         imageURL: String,
+         address: String?,
+         rating: Double?,
+         imageURL: String?,
          coordinates: CLLocationCoordinate2D,
          amenities: [String],
          websiteURL: String?,
          phoneNumber: String?,
-         priceLevel: PriceLevel) {
+         priceLevel: PriceLevel?) {
         self.id = id
         self.name = name
         self.description = description

@@ -5,7 +5,7 @@ import MapKit
 // It shows the hotel's name, address, rating, amenities, and location on a map.
 // Users can select the hotel, visit its website, or change their hotel selection.
 struct HotelDetailView: View {
-    let hotel: Hotel
+    let hotel: Hotel?
     let city: City
     @Binding var selectedHotel: Hotel?
     @Environment(\.dismiss) private var dismiss
@@ -15,107 +15,105 @@ struct HotelDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Hotel Image
-                AsyncImage(url: URL(string: hotel.imageURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                }
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    // Hotel Name and Rating
-                    HStack {
+                if let hotel = hotel {
+                    // Hotel Image
+                    if let imageURL = hotel.imageURL {
+                        AsyncImage(url: URL(string: imageURL)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(height: 200)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 200)
+                                    .clipped()
+                            case .failure:
+                                Image(systemName: "building.2")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(height: 200)
+                                    .foregroundColor(.gray)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    } else {
+                        Image(systemName: "building.2")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(height: 200)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    // Hotel Details
+                    VStack(alignment: .leading, spacing: 12) {
                         Text(hotel.name)
                             .font(.title)
                             .fontWeight(.bold)
-                        Spacer()
-                        HStack(spacing: 4) {
-                            Text("\(hotel.rating, specifier: "%.1f")")
-                                .foregroundColor(.yellow)
-                            Text("•")
-                                .foregroundColor(.secondary)
-                            Text(hotel.priceLevel.rawValue)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    // Address
-                    Text(hotel.address)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    // Description
-                    Text(hotel.description)
-                        .font(.body)
-                    
-                    // Map
-                    Map(coordinateRegion: .constant(MKCoordinateRegion(
-                        center: hotel.coordinates,
-                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                    )), annotationItems: [hotel]) { hotel in
-                        MapMarker(coordinate: hotel.coordinates)
-                    }
-                    .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    
-                    // Amenities
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Amenities")
-                            .font(.headline)
                         
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 8) {
-                            ForEach(hotel.amenities, id: \.self) { amenity in
-                                HStack {
-                                    Image(systemName: amenityIcon(for: amenity))
-                                        .foregroundColor(.blue)
-                                    Text(amenity)
-                                        .font(.subheadline)
-                                }
+                        if let address = hotel.address {
+                            Text(address)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        if let rating = hotel.rating {
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.yellow)
+                                Text(String(format: "%.1f", rating))
                             }
                         }
-                    }
-                    
-                    // Action Buttons
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            selectedHotel = hotel
-                            dismiss()
-                        }) {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Select Hotel")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
+                        
+                        if let priceLevel = hotel.priceLevel {
+                            Text(String(repeating: "$", count: priceLevel.rawValue.count))
+                                .foregroundColor(.green)
                         }
                         
                         if let websiteURL = hotel.websiteURL {
-                            Button(action: { showingWebsite = true }) {
-                                HStack {
-                                    Image(systemName: "globe")
-                                    Text("Visit Website")
+                            Link("Visit Website", destination: URL(string: websiteURL)!)
+                                .foregroundColor(.blue)
+                        }
+                        
+                        if let phoneNumber = hotel.phoneNumber {
+                            Button(action: {
+                                if let url = URL(string: "tel:\(phoneNumber)") {
+                                    UIApplication.shared.open(url)
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.green)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
+                            }) {
+                                HStack {
+                                    Image(systemName: "phone.fill")
+                                    Text(phoneNumber)
+                                }
+                                .foregroundColor(.blue)
                             }
                         }
                     }
+                    .padding()
+                    
+                    // Select Hotel Button
+                    Button(action: {
+                        selectedHotel = hotel
+                        dismiss()
+                    }) {
+                        Text("Select This Hotel")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                    .padding()
+                } else {
+                    Text("No hotel details available")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
                 }
-                .padding()
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -132,7 +130,7 @@ struct HotelDetailView: View {
             }
         }
         .sheet(isPresented: $showingWebsite) {
-            if let websiteURLString = hotel.websiteURL,
+            if let websiteURLString = hotel?.websiteURL,
                let websiteURL = URL(string: websiteURLString) {
                 NavigationView {
                     HotelWebView(url: websiteURL)
@@ -146,11 +144,6 @@ struct HotelDetailView: View {
                             }
                         }
                 }
-            }
-        }
-        .onChange(of: selectedHotel) { newHotel in
-            if let newHotel = newHotel {
-                dismiss()
             }
         }
     }

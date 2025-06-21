@@ -8,13 +8,13 @@ class GooglePlacesService {
     
     // Search for places by text query
     func searchPlaces(query: String, type: String? = nil) async throws -> [Place] {
-        print("\n=== Starting searchPlaces ===")
-        print("Query: \(query)")
+        Logger.info("Starting searchPlaces")
+        Logger.debug("Query: \(query)")
         
         // Construct URL using URLComponents with base URL
         let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.searchEndpoint
         guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+            Logger.error("Failed to create URL components for endpoint: \(fullEndpoint)")
             throw NetworkError.invalidURL
         }
         
@@ -24,7 +24,7 @@ class GooglePlacesService {
         ]
         
         guard let url = urlComponents.url else {
-            print("❌ Failed to create URL from components")
+            Logger.error("Failed to create URL from components")
             throw NetworkError.invalidURL
         }
         
@@ -49,113 +49,58 @@ class GooglePlacesService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         } catch {
-            print("❌ Failed to serialize request body: \(error)")
+            Logger.error("Failed to serialize request body: \(error)")
             throw NetworkError.apiError(message: "Failed to serialize request: \(error.localizedDescription)")
         }
         
-        print("\n=== Making API Request ===")
-        print("URL: \(url)")
-        print("Headers: \(request.allHTTPHeaderFields ?? [:])")
-        if let httpBody = request.httpBody {
-            print("Body: \(String(decoding: httpBody, as: UTF8.self))")
-        } else {
-            print("Body: nil")
-        }
+        Logger.debug("Making API Request")
+        Logger.debug("URL: \(url)")
         
         do {
-            print("\n=== Starting Network Request ===")
+            Logger.debug("Starting Network Request")
             let (data, response) = try await URLSession.shared.data(for: request)
-            print("Network request completed")
             
             if let httpResponse = response as? HTTPURLResponse {
-                print("\n=== API Response ===")
-                print("Status Code: \(httpResponse.statusCode)")
-                print("Headers: \(httpResponse.allHeaderFields)")
-                
-                print("Raw Response: \(String(decoding: data, as: UTF8.self))")
+                Logger.debug("Status Code: \(httpResponse.statusCode)")
                 
                 if httpResponse.statusCode != 200 {
-                    print("❌ API Error: HTTP \(httpResponse.statusCode)")
+                    Logger.error("API Error: HTTP \(httpResponse.statusCode)")
                     let errorString = String(decoding: data, as: UTF8.self)
-                    print("Error details: \(errorString)")
+                    Logger.error("Error details: \(errorString)")
                     throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode): \(errorString)")
                 }
-            } else {
-                // print("❌ Invalid response type: \(type(of: response))")
-                throw NetworkError.apiError(message: "Invalid response type")
             }
             
-            print("\n=== Decoding Response ===")
+            Logger.debug("Decoding Response")
             let decoder = JSONDecoder()
             do {
                 let response = try decoder.decode(PlacesResponse.self, from: data)
-                print("Successfully decoded \(response.places.count) places")
-                
-                // Log details of each place
-                for (index, place) in response.places.enumerated() {
-                    print("\nPlace \(index + 1):")
-                    print("  ID: \(place.id)")
-                    print("  Name: \(place.displayName.text)")
-                    print("  Address: \(place.formattedAddress)")
-                    print("  Types: \(place.types)")
-                    if let photos = place.photos {
-                        print("  Photos: \(photos.count)")
-                        for (photoIndex, photo) in photos.enumerated() {
-                            print("    Photo \(photoIndex + 1):")
-                            print("      Name: \(photo.name)")
-                            print("      URI: \(photo.uri ?? "nil")")
-                            print("      Width: \(photo.widthPx ?? 0)")
-                            print("      Height: \(photo.heightPx ?? 0)")
-                            if let photoURL = photo.photoURL {
-                                print("      Generated URL: \(photoURL)")
-                            }
-                        }
-                    } else {
-                        print("  No photos available")
-                    }
-                }
-                
+                Logger.success("Successfully decoded \(response.places.count) places")
                 return response.places
             } catch {
-                print("\n❌ Decoding Error: \(error)")
-                if let decodingError = error as? DecodingError {
-                    switch decodingError {
-                    case .keyNotFound(let key, let context):
-                        print("Missing key: \(key.stringValue)")
-                        print("Coding path: \(context.codingPath)")
-                    case .typeMismatch(let type, let context):
-                        print("Type mismatch: expected \(type)")
-                        print("Coding path: \(context.codingPath)")
-                    case .valueNotFound(let type, let context):
-                        print("Value not found: expected \(type)")
-                        print("Coding path: \(context.codingPath)")
-                    case .dataCorrupted(let context):
-                        print("Data corrupted: \(context.debugDescription)")
-                    @unknown default:
-                        print("Unknown decoding error")
-                    }
-                }
+                Logger.error("Decoding Error: \(error)")
                 throw NetworkError.apiError(message: "Failed to decode response: \(error.localizedDescription)")
             }
         } catch let error as URLError {
-            print("\n❌ URL Error: \(error)")
-            print("Error code: \(error.code)")
-            print("Error description: \(error.localizedDescription)")
-            print("Error user info: \(error.userInfo)")
+            Logger.error("URL Error: \(error)")
             throw NetworkError.apiError(message: "URL Error: \(error.localizedDescription)")
         } catch {
-            print("\n❌ Network Error: \(error)")
-            // print("Error type: \(type(of: error))")
+            Logger.error("Network Error: \(error)")
             throw error
         }
     }
     
     // Get nearby places
     func getNearbyPlaces(location: CLLocationCoordinate2D, radius: Int = 5000, types: [String]? = nil) async throws -> [Place] {
+        Logger.info("Getting nearby places")
+        Logger.debug("Location: \(location.latitude), \(location.longitude)")
+        Logger.debug("Radius: \(radius)")
+        Logger.debug("Types: \(types)")
+        
         // Construct URL using URLComponents with base URL
         let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.nearbyEndpoint
         guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+            Logger.error("Failed to create URL components for endpoint: \(fullEndpoint)")
             throw NetworkError.invalidURL
         }
         
@@ -165,7 +110,7 @@ class GooglePlacesService {
         ]
         
         guard let url = urlComponents.url else {
-            print("❌ Failed to create URL from components")
+            Logger.error("Failed to create URL from components")
             throw NetworkError.invalidURL
         }
         
@@ -197,27 +142,27 @@ class GooglePlacesService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         } catch {
-            print("❌ Failed to serialize request body: \(error)")
+            Logger.error("Failed to serialize request body: \(error)")
             throw NetworkError.apiError(message: "Failed to serialize request: \(error.localizedDescription)")
         }
         
-        print("Fetching nearby places with URL: \(url)")
-        print("Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        Logger.debug("Fetching nearby places with URL: \(url)")
+        Logger.debug("Request headers: \(request.allHTTPHeaderFields ?? [:])")
         if let httpBody = request.httpBody,
            let bodyString = String(data: httpBody, encoding: .utf8) {
-            print("Request body: \(bodyString)")
+            Logger.debug("Request body: \(bodyString)")
         } else {
-            print("Request body: nil")
+            Logger.debug("Request body: nil")
         }
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse {
-                print("HTTP Status Code: \(httpResponse.statusCode)")
-                print("Response headers: \(httpResponse.allHeaderFields)")
+                Logger.debug("HTTP Status Code: \(httpResponse.statusCode)")
+                Logger.debug("Response headers: \(httpResponse.allHeaderFields)")
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("Raw response data: \(responseString)")
+                    Logger.debug("Raw response data: \(responseString)")
                 }
                 
                 if httpResponse.statusCode != 200 {
@@ -230,20 +175,22 @@ class GooglePlacesService {
             
             let decoder = JSONDecoder()
             let placesResponse = try decoder.decode(PlacesResponse.self, from: data)
-            print("Successfully decoded \(placesResponse.places.count) nearby places")
+            Logger.success("Successfully decoded \(placesResponse.places.count) nearby places")
             return placesResponse.places
         } catch {
-            print("Error fetching nearby places: \(error)")
+            Logger.error("Error fetching nearby places: \(error)")
             throw error
         }
     }
     
     // Get place details
     func getPlaceDetails(placeId: String) async throws -> PlaceDetails {
+        Logger.info("Getting place details for ID: \(placeId)")
+        
         // Construct URL using URLComponents with base URL
         let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.detailsEndpoint + "/" + placeId
         guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            print("❌ Failed to create URL components for endpoint: \(fullEndpoint)")
+            Logger.error("Failed to create URL components for endpoint: \(fullEndpoint)")
             throw NetworkError.invalidURL
         }
         
@@ -253,7 +200,7 @@ class GooglePlacesService {
         ]
         
         guard let url = urlComponents.url else {
-            print("❌ Failed to create URL from components")
+            Logger.error("Failed to create URL from components")
             throw NetworkError.invalidURL
         }
         
@@ -263,14 +210,14 @@ class GooglePlacesService {
         request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
         request.setValue("id,displayName,formattedAddress,location,types,photos.name,photos.widthPx,photos.heightPx,primaryType,primaryTypeDisplayName,websiteUri", forHTTPHeaderField: "X-Goog-FieldMask")
         
-        print("Fetching place details with URL: \(url)")
+        Logger.debug("Fetching place details with URL: \(url)")
         let (data, response) = try await URLSession.shared.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
-            print("HTTP Status Code: \(httpResponse.statusCode)")
-            print("Response headers: \(httpResponse.allHeaderFields)")
+            Logger.debug("HTTP Status Code: \(httpResponse.statusCode)")
+            Logger.debug("Response headers: \(httpResponse.allHeaderFields)")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("Raw response data: \(responseString)")
+                Logger.debug("Raw response data: \(responseString)")
             }
             
             if httpResponse.statusCode != 200 {
@@ -286,7 +233,7 @@ class GooglePlacesService {
     
     // Fetch tourist attractions for a city
     func fetchTouristAttractions(for city: City) async throws -> [TouristAttraction] {
-        print("\n=== Fetching Tourist Attractions for \(city.name) ===")
+        Logger.info("Fetching Tourist Attractions for \(city.name)")
         
         // Create a set to track unique place names to prevent duplicates
         var seenNames = Set<String>()
@@ -294,13 +241,19 @@ class GooglePlacesService {
         
         // First, search for the city's landmarks using Places API to get proper photos
         for landmark in city.landmarks {
-            print("Searching for landmark: \(landmark.name)")
+            Logger.debug("Searching for landmark: \(landmark.name)")
             let searchQuery = "\(landmark.name) in \(city.name)"
             let places = try await searchPlaces(query: searchQuery)
             
             if let place = places.first {
-                // Use the first matching place
-                let imageURL = place.photos?.first?.photoURL ?? getFallbackImageURL(for: .historical)
+                // TEMPORARY DEBUG: Abort if no photo URL is available
+                guard let photoURL = place.photos?.first?.photoURL else {
+                    Logger.error("❌ No photo URL available for landmark: \(landmark.name)")
+                    fatalError("DEBUG: No photo URL available for landmark: \(landmark.name)")
+                }
+                
+                let imageURL = photoURL
+                Logger.debug("Found image URL for \(landmark.name): \(imageURL)")
                 
                 let attraction = TouristAttraction(
                     id: UUID(),
@@ -320,7 +273,10 @@ class GooglePlacesService {
                 seenNames.insert(landmark.name)
             } else {
                 // Fallback to original landmark data if no match found
-                print("No Places API match found for landmark: \(landmark.name)")
+                Logger.debug("No Places API match found for landmark: \(landmark.name)")
+                let fallbackURL = getFallbackImageURL(for: .historical)
+                Logger.debug("Using fallback image URL: \(fallbackURL)")
+                
                 let attraction = TouristAttraction(
                     id: UUID(),
                     name: landmark.name,
@@ -331,7 +287,7 @@ class GooglePlacesService {
                         latitude: city.coordinates.latitude,
                         longitude: city.coordinates.longitude
                     ),
-                    imageURL: landmark.imageURL ?? getFallbackImageURL(for: .historical),
+                    imageURL: fallbackURL,
                     tips: generateTips(for: .historical),
                     websiteURL: nil
                 )
@@ -341,89 +297,96 @@ class GooglePlacesService {
         }
         
         // Then, fetch nearby tourist attractions using the Places API
-        let searchQuery = "top tourist attractions in \(city.name)"
-        let places = try await searchPlaces(query: searchQuery)
+        let searchQueries = [
+            "top tourist attractions in \(city.name)",
+            "must visit places in \(city.name)",
+            "popular landmarks in \(city.name)",
+            "best museums in \(city.name)",
+            "famous monuments in \(city.name)"
+        ]
         
-        // Convert Places to TouristAttractions
-        for place in places {
-            let name = place.displayName.text
+        for query in searchQueries {
+            Logger.debug("Searching with query: \(query)")
+            let places = try await searchPlaces(query: query)
             
-            // Skip if we've already seen this name
-            guard !seenNames.contains(name) else { continue }
-            
-            // Determine the category and estimated duration based on place types
-            let category = determineCategory(from: place.types)
-            let duration = estimateVisitDuration(type: place.types.first ?? "tourist_attraction", name: name)
-            
-            // Get the photo URL if available, otherwise use a relevant fallback
-            var imageURL = getFallbackImageURL(for: category)
-            if let photos = place.photos, !photos.isEmpty {
-                if let firstPhotoURL = photos.first?.photoURL {
-                    imageURL = firstPhotoURL
-                    print("Using place photo URL: \(firstPhotoURL)")
+            // Convert Places to TouristAttractions
+            for place in places {
+                let name = place.displayName.text
+                
+                // Skip if we've already seen this name
+                guard !seenNames.contains(name) else { continue }
+                
+                // Determine the category and estimated duration based on place types
+                let category = determineCategory(from: place.types)
+                let duration = estimateVisitDuration(type: place.types.first ?? "tourist_attraction", name: name)
+                
+                // Get the photo URL if available, otherwise use a relevant fallback
+                var imageURL = getFallbackImageURL(for: category)
+                if let photos = place.photos, !photos.isEmpty {
+                    if let firstPhotoURL = photos.first?.photoURL {
+                        imageURL = firstPhotoURL
+                        Logger.debug("Using place photo URL for \(name): \(firstPhotoURL)")
+                    } else {
+                        Logger.warning("Photo object exists but URL could not be generated for \(name).")
+                    }
                 } else {
-                    print("Failed to get photo URL for place: \(name)")
+                    Logger.debug("No photos available for \(name), using fallback URL: \(imageURL)")
                 }
+                
+                let attraction = TouristAttraction(
+                    id: UUID(),
+                    name: name,
+                    description: place.formattedAddress,
+                    category: category,
+                    estimatedDuration: duration,
+                    coordinates: TouristAttraction.Coordinates(
+                        latitude: place.location.latitude,
+                        longitude: place.location.longitude
+                    ),
+                    imageURL: imageURL,
+                    tips: generateTips(for: category),
+                    websiteURL: nil
+                )
+                
+                attractions.append(attraction)
+                seenNames.insert(name)
             }
-            
-            let attraction = TouristAttraction(
-                id: UUID(),
-                name: name,
-                description: place.formattedAddress,
-                category: category,
-                estimatedDuration: duration,
-                coordinates: TouristAttraction.Coordinates(
-                    latitude: place.location.latitude,
-                    longitude: place.location.longitude
-                ),
-                imageURL: imageURL,
-                tips: generateTips(for: category),
-                websiteURL: nil
-            )
-            
-            attractions.append(attraction)
-            seenNames.insert(name)
         }
         
-        // Sort attractions by category and limit to 15 total to ensure a good mix
-        return Array(attractions.prefix(15))
+        // Sort attractions by category and limit to 30 total to ensure a good mix
+        return Array(attractions.prefix(30))
     }
     
     private func estimateVisitDuration(type: String, name: String) -> TimeInterval {
-        // Convert minutes to seconds (TimeInterval)
-        let minutesToSeconds: (Int) -> TimeInterval = { minutes in
-            TimeInterval(minutes * 60)
-        }
-        
-        // Duration in minutes, converted to seconds
+        // Duration in minutes
         switch type.lowercased() {
         case "museum":
-            return minutesToSeconds(180) // 3 hours
+            return 180 // 3 hours
         case "art_gallery":
-            return minutesToSeconds(120) // 2 hours
+            return 120 // 2 hours
         case "park", "garden":
-            return minutesToSeconds(90) // 1.5 hours
+            return 90 // 1.5 hours
         case "church", "temple", "mosque", "religious":
-            return minutesToSeconds(60) // 1 hour
+            return 60 // 1 hour
         case "landmark", "monument":
-            return minutesToSeconds(90) // 1.5 hours
+            return 90 // 1.5 hours
         case "restaurant", "cafe":
-            return minutesToSeconds(90) // 1.5 hours
+            return 90 // 1.5 hours
         case "shopping_mall":
-            return minutesToSeconds(120) // 2 hours
+            return 120 // 2 hours
         case "amusement_park", "theme_park":
-            return minutesToSeconds(300) // 5 hours
+            return 300 // 5 hours
         case "zoo", "aquarium":
-            return minutesToSeconds(240) // 4 hours
+            return 240 // 4 hours
         default:
             // Check name for keywords that might indicate a major attraction
             let lowercaseName = name.lowercased()
             if lowercaseName.contains("palace") || lowercaseName.contains("castle") {
-                return minutesToSeconds(180) // 3 hours
+                return 180 // 3 hours
             } else if lowercaseName.contains("tower") || lowercaseName.contains("cathedral") {
-                return minutesToSeconds(120) // 2 hours
+                return 120 // 2 hours
             } else {
-                return minutesToSeconds(90) // 1.5 hours default
+                return 90 // 1.5 hours default
             }
         }
     }
@@ -431,25 +394,25 @@ class GooglePlacesService {
     private func getFallbackImageURL(for category: TouristAttraction.Category) -> String {
         switch category {
         case .museum:
-            return "https://images.unsplash.com/photo-1518998053901-5348d3961a04"
+            return "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=800&q=80"
         case .cultural:
-            return "https://images.unsplash.com/photo-1577083552431-6e5fd01988ec"
+            return "https://images.unsplash.com/photo-1577083552431-6e5fd01988ec?auto=format&fit=crop&w=800&q=80"
         case .historical:
-            return "https://images.unsplash.com/photo-1589828994425-a83f2f9b8488"
+            return "https://images.unsplash.com/photo-1589828994425-a83f2f9b8488?auto=format&fit=crop&w=800&q=80"
         case .nature:
-            return "https://images.unsplash.com/photo-1511497584788-876760111969"
+            return "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=800&q=80"
         case .entertainment:
-            return "https://images.unsplash.com/photo-1514525253161-7a46d19cd819"
+            return "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80"
         case .dining:
-            return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4"
+            return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
         case .shopping:
-            return "https://images.unsplash.com/photo-1441986300917-64674bd600d8"
+            return "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80"
         case .religious:
-            return "https://images.unsplash.com/photo-1548276145-69a9521f0499"
+            return "https://images.unsplash.com/photo-1548276145-69a9521f0499?auto=format&fit=crop&w=800&q=80"
         case .architecture:
-            return "https://images.unsplash.com/photo-1487958449943-2429e8be8625"
+            return "https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=800&q=80"
         case .park:
-            return "https://images.unsplash.com/photo-1519331379826-f10be5486c6f"
+            return "https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=800&q=80"
         }
     }
     
@@ -549,18 +512,22 @@ class GooglePlacesService {
     }
     
     // Find the best hotel in a city
-    func findBestHotel(in city: City) async throws -> Hotel {
-        print("\n=== Finding Best Hotel in \(city.name) ===")
+    func findBestHotel(in city: City) async throws -> Hotel? {
+        Logger.info("Finding Best Hotel in \(city.name)")
         
         let searchQuery = "best luxury hotel in \(city.name)"
         let places = try await searchPlaces(query: searchQuery)
         
         guard let bestHotel = places.first else {
-            throw NetworkError.apiError(message: "No hotels found in \(city.name)")
+            Logger.warning("No hotels found in \(city.name)")
+            return nil
         }
         
+        // Get additional details for the hotel
+        let details = try await getPlaceDetails(placeId: bestHotel.id)
+        
         // Determine price level based on the place's types
-        let priceLevel: Hotel.PriceLevel
+        let priceLevel: Hotel.PriceLevel?
         if bestHotel.types.contains("luxury") {
             priceLevel = .ultraLuxury
         } else if bestHotel.types.contains("upscale") {
@@ -578,22 +545,28 @@ class GooglePlacesService {
         if bestHotel.types.contains("fitness_center") { amenities.append("Fitness Center") }
         if bestHotel.types.contains("swimming_pool") { amenities.append("Swimming Pool") }
         
-        return Hotel(
+        // Get the first photo URL or use a default image
+        let imageURL = bestHotel.photos?.first?.photoURL
+        
+        let hotel = Hotel(
             id: UUID(),
             name: bestHotel.displayName.text,
             description: "Experience luxury and comfort at \(bestHotel.displayName.text), one of \(city.name)'s finest hotels.",
             address: bestHotel.formattedAddress,
-            rating: 4.5, // Default rating since Places API New doesn't provide ratings directly
-            imageURL: bestHotel.photos?.first?.photoURL ?? "https://images.unsplash.com/photo-1566073771259-6a8506099945",
+            rating: nil, // Rating not available in the current API response
+            imageURL: imageURL,
             coordinates: CLLocationCoordinate2D(
                 latitude: bestHotel.location.latitude,
                 longitude: bestHotel.location.longitude
             ),
             amenities: amenities,
-            websiteURL: nil,
-            phoneNumber: nil,
+            websiteURL: details.websiteUri,
+            phoneNumber: nil, // Phone number not available in the current API response
             priceLevel: priceLevel
         )
+        
+        Logger.success("Successfully created hotel: \(hotel.name)")
+        return hotel
     }
     
     // Add this enum before the searchCities method
@@ -607,8 +580,8 @@ class GooglePlacesService {
     /// - Parameter query: The search query for the city
     /// - Returns: An array of City objects matching the search query
     func searchCities(query: String) async throws -> [City] {
-        print("\n=== Starting searchCities ===")
-        print("Query: \(query)")
+        Logger.info("Starting searchCities")
+        Logger.debug("Query: \(query)")
         
         let places = try await searchPlaces(query: query)
         
@@ -637,7 +610,7 @@ class GooglePlacesService {
             )
         }
         
-        print("Found \(cities.count) cities")
+        Logger.success("Found \(cities.count) cities")
         return cities
     }
     
@@ -745,16 +718,11 @@ struct Photo: Codable {
     }
     
     var photoURL: String? {
-        guard let name = name.components(separatedBy: "/").last else { 
-            print("Photo name is invalid")
-            return nil 
-        }
-        
-        // Construct the Places Photo URL with the photo reference
-        let baseURL = "https://places.googleapis.com/v1/"
-        let maxWidth = 800 // Maximum width for photos
-        let photoURL = "\(baseURL)\(self.name)/media?maxWidthPx=\(maxWidth)&key=\(GooglePlacesConfig.apiKey)"
-        print("Generated photo URL: \(photoURL)")
+        // Correct format for Places API v1
+        let baseURL = "https://places.googleapis.com/v1"
+        let maxHeight = 800
+        let photoURL = "\(baseURL)/\(name)/media?maxHeightPx=\(maxHeight)&key=\(GooglePlacesConfig.apiKey)"
+        Logger.debug("Generated v1 photo URL: \(photoURL)")
         return photoURL
     }
 }

@@ -9,18 +9,16 @@ struct HotelListView: View {
     let city: City
     @Binding var selectedHotel: Hotel?
     @Environment(\.dismiss) private var dismiss
-    @State private var hotels: [Hotel] = []
-    @State private var isLoading = true
-    @State private var error: Error?
+    @StateObject private var viewModel = HotelListViewModel()
     @State private var selectedHotelForDetails: Hotel?
     @State private var showingHotelDetails = false
     
     var body: some View {
         NavigationView {
             Group {
-                if isLoading {
+                if viewModel.isLoading {
                     ProgressView("Loading hotels...")
-                } else if let error = error {
+                } else if let error = viewModel.error {
                     VStack {
                         Text("Error loading hotels")
                             .foregroundColor(.red)
@@ -29,36 +27,34 @@ struct HotelListView: View {
                             .foregroundColor(.secondary)
                         Button("Try Again") {
                             Task {
-                                await loadHotels()
+                                await viewModel.fetchHotels(for: city)
                             }
                         }
                         .buttonStyle(.bordered)
                     }
-                } else if hotels.isEmpty {
+                } else if viewModel.hotels.isEmpty {
                     Text("No hotels found")
                         .foregroundColor(.secondary)
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(hotels, id: \.id) { hotel in
-                                HotelRow(hotel: hotel) {
-                                    selectedHotel = hotel
-                                    dismiss()
-                                }
-                                .onTapGesture {
-                                    selectedHotelForDetails = hotel
-                                    showingHotelDetails = true
-                                }
+                    List {
+                        ForEach(viewModel.hotels) { hotel in
+                            HotelRow(hotel: hotel) {
+                                selectedHotel = hotel
+                                dismiss()
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedHotelForDetails = hotel
+                                showingHotelDetails = true
                             }
                         }
-                        .padding()
                     }
                 }
             }
             .navigationTitle("Hotels in \(city.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
@@ -67,91 +63,28 @@ struct HotelListView: View {
             .sheet(isPresented: $showingHotelDetails) {
                 if let hotel = selectedHotelForDetails {
                     NavigationView {
-                        HotelDetailView(hotel: hotel, city: city, selectedHotel: $selectedHotel)
-                            .navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .navigationBarTrailing) {
-                                    Button("Done") {
-                                        showingHotelDetails = false
-                                    }
+                        HotelDetailView(
+                            hotel: hotel,
+                            city: city,
+                            selectedHotel: $selectedHotel
+                        )
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Back") {
+                                    showingHotelDetails = false
                                 }
                             }
+                        }
                     }
                 }
             }
         }
-        .task {
-            await loadHotels()
-        }
-    }
-    
-    private func loadHotels() async {
-        isLoading = true
-        error = nil
-        
-        do {
-            let searchQuery = "hotels in \(city.name)"
-            print("Searching for hotels with query: \(searchQuery)")
-            let places = try await GooglePlacesService.shared.searchPlaces(query: searchQuery)
-            print("Found \(places.count) places")
-            
-            // Convert Places to Hotels
-            var loadedHotels: [Hotel] = []
-            for place in places {
-                print("Processing hotel: \(place.displayName.text)")
-                
-                // Fetch additional details including website URL
-                let details = try await GooglePlacesService.shared.getPlaceDetails(placeId: place.id)
-                
-                let priceLevel: Hotel.PriceLevel
-                if place.types.contains("luxury") {
-                    priceLevel = .ultraLuxury
-                } else if place.types.contains("upscale") {
-                    priceLevel = .luxury
-                } else if place.types.contains("budget") {
-                    priceLevel = .budget
-                } else {
-                    priceLevel = .moderate
-                }
-                
-                // Get amenities based on place types
-                var amenities = ["Wi-Fi", "Air Conditioning"]
-                if place.types.contains("spa") { amenities.append("Spa") }
-                if place.types.contains("restaurant") { amenities.append("Restaurant") }
-                if place.types.contains("fitness_center") { amenities.append("Fitness Center") }
-                if place.types.contains("swimming_pool") { amenities.append("Swimming Pool") }
-                
-                let imageURL = place.photos?.first?.photoURL ?? "https://images.unsplash.com/photo-1566073771259-6a8506099945"
-                print("Hotel image URL: \(imageURL)")
-                
-                let hotel = Hotel(
-                    id: UUID(),
-                    name: place.displayName.text,
-                    description: "Experience comfort and convenience at \(place.displayName.text), located in \(city.name).",
-                    address: place.formattedAddress,
-                    rating: 4.5,
-                    imageURL: imageURL,
-                    coordinates: CLLocationCoordinate2D(
-                        latitude: place.location.latitude,
-                        longitude: place.location.longitude
-                    ),
-                    amenities: amenities,
-                    websiteURL: details.websiteUri,
-                    phoneNumber: nil,
-                    priceLevel: priceLevel
-                )
-                loadedHotels.append(hotel)
-                print("Added hotel: \(hotel.name)")
+        .onAppear {
+            Task {
+                await viewModel.fetchHotels(for: city)
             }
-            
-            print("Total hotels loaded: \(loadedHotels.count)")
-            self.hotels = loadedHotels
-        } catch {
-            print("Error loading hotels: \(error)")
-            self.error = error
         }
-        
-        isLoading = false
     }
 }
 
@@ -163,33 +96,46 @@ struct HotelRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Hotel Image
-            AsyncImage(url: URL(string: hotel.imageURL)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
+            if let imageURL = hotel.imageURL {
+                AsyncImage(url: URL(string: imageURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                }
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
+                    .frame(height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            .frame(height: 120)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
             
             // Hotel Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(hotel.name)
                     .font(.headline)
                 
-                Text(hotel.address)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                if let address = hotel.address {
+                    Text(address)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
                 
                 HStack {
-                    Text("\(hotel.rating, specifier: "%.1f")")
-                        .foregroundColor(.yellow)
-                    Text("•")
-                        .foregroundColor(.secondary)
-                    Text(hotel.priceLevel.rawValue)
-                        .foregroundColor(.secondary)
+                    if let rating = hotel.rating {
+                        Text("\(rating, specifier: "%.1f")")
+                            .foregroundColor(.yellow)
+                        Text("•")
+                            .foregroundColor(.secondary)
+                    }
+                    if let priceLevel = hotel.priceLevel {
+                        Text(priceLevel.rawValue)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .font(.subheadline)
             }
