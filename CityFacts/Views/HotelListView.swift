@@ -8,75 +8,79 @@ import WebKit
 struct HotelListView: View {
     let city: City
     @Binding var selectedHotel: Hotel?
-    @Environment(\.dismiss) private var dismiss
+    var onDone: (() -> Void)? = nil
+
     @StateObject private var viewModel = HotelListViewModel()
-    @State private var selectedHotelForDetails: Hotel?
-    @State private var showingHotelDetails = false
-    
+
     var body: some View {
-        NavigationView {
-            Group {
-                if viewModel.isLoading {
-                    ProgressView("Loading hotels...")
-                } else if let error = viewModel.error {
-                    VStack {
-                        Text("Error loading hotels")
-                            .foregroundColor(.red)
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Button("Try Again") {
-                            Task {
-                                await viewModel.fetchHotels(for: city)
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                } else if viewModel.hotels.isEmpty {
-                    Text("No hotels found")
+        VStack {
+            if let selected = selectedHotel {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Currently Selected Hotel")
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                } else {
-                    List {
-                        ForEach(viewModel.hotels) { hotel in
-                            HotelRow(hotel: hotel) {
-                                selectedHotel = hotel
-                                dismiss()
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedHotelForDetails = hotel
-                                showingHotelDetails = true
-                            }
-                        }
-                    }
+                    HotelCard(hotel: selected)
+                        .overlay(
+                            Text("Selected")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.blue)
+                                .clipShape(Capsule())
+                                .padding(8),
+                            alignment: .topTrailing
+                        )
                 }
+                .padding(.bottom)
             }
-            .navigationTitle("Hotels in \(city.name)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .sheet(isPresented: $showingHotelDetails) {
-                if let hotel = selectedHotelForDetails {
-                    NavigationView {
-                        HotelDetailView(
+
+            if viewModel.isLoading {
+                ProgressView("Loading hotels...")
+                    .padding()
+            } else if viewModel.hotels.isEmpty {
+                Text("No hotels found")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                List(viewModel.hotels) { hotel in
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Hotel card for viewing details
+                        NavigationLink(destination: HotelDetailView(
                             hotel: hotel,
                             city: city,
                             selectedHotel: $selectedHotel
-                        )
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Back") {
-                                    showingHotelDetails = false
-                                }
+                        )) {
+                            HotelCard(hotel: hotel)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Separate select button
+                        Button(action: {
+                            selectedHotel = hotel
+                            onDone?()
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Select This Hotel")
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
                     }
+                    .padding(.vertical, 4)
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("Select Hotel")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    onDone?()
                 }
             }
         }
