@@ -7,14 +7,18 @@ struct ItineraryView: View {
     let city: City
     let startDate: Date
     let endDate: Date
+    let homeCity: City
+    let tripSchedule: TripSchedule
     @State private var attractions: [TouristAttraction] = []
     @State private var selectedHotels: [Int: Hotel?] = [:] // Map of day number to optional hotel
+    @State private var transitDays: [TransitDay] = [] // Transit routes for each day
     @State private var isLoading = true
     @State private var error: Error?
     @State private var showingHotelList = false
     @State private var selectedDayForHotel: Int? = nil
     @State private var showingHotelDetail = false
     @State private var selectedHotelForDetail: Hotel? = nil
+    @State private var showingCalendarView = false
     @Environment(\.dismiss) private var dismiss
     
     private var numberOfDays: Int {
@@ -53,22 +57,38 @@ struct ItineraryView: View {
                                 get: { self.selectedHotels[day] ?? nil },
                                 set: { self.selectedHotels[day] = $0 }
                             )
-                            
-                            DayItineraryView(
-                                dayNumber: day,
-                                date: dateForDay(dayIndex),
+                            let timelineItems = PersonalAvailabilityCalendar.generateChronologicalTimeline(
+                                dayDate: dateForDay(dayIndex),
                                 attractions: attractionsForDay(dayIndex),
-                                city: city,
-                                selectedHotel: hotelBinding,
-                                onHotelSelect: { day in
-                                    selectedDayForHotel = day
-                                    showingHotelList = true
-                                },
-                                onHotelImageTap: { hotel in
-                                    selectedHotelForDetail = hotel
-                                    showingHotelDetail = true
-                                }
+                                transitRoutes: transitRoutesForDay(day),
+                                hotel: self.selectedHotels[day] ?? nil
                             )
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Day \(day)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                Text(formatDate(dateForDay(dayIndex)))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                HStack {
+                                    if let hotel = self.selectedHotels[day], let unwrappedHotel = hotel {
+                                        Text("Hotel: \(unwrappedHotel.name)")
+                                            .font(.subheadline)
+                                    }
+                                    Spacer()
+                                    Button(action: {
+                                        selectedDayForHotel = day
+                                        showingHotelList = true
+                                    }) {
+                                        Text(self.selectedHotels[day] == nil ? "Select Hotel" : "Change Hotel")
+                                            .font(.subheadline)
+                                            .foregroundColor(.blue)
+                                    }
+                                    .buttonStyle(BorderlessButtonStyle())
+                                }
+                                ChronologicalDayView(timelineItems: timelineItems)
+                            }
+                            .padding(.vertical, 8)
                         }
                     }
                 }
@@ -80,6 +100,15 @@ struct ItineraryView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingCalendarView = true
+                    } label: {
+                        Image(systemName: "calendar")
+                            .foregroundColor(.blue)
                     }
                 }
             }
@@ -126,6 +155,19 @@ struct ItineraryView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingCalendarView) {
+            NavigationStack {
+                ItineraryCalendarView(
+                    city: city,
+                    startDate: startDate,
+                    endDate: endDate,
+                    homeCity: homeCity,
+                    tripSchedule: tripSchedule
+                )
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .onAppear {
             // Only load data once when the view first appears
             if attractions.isEmpty {
@@ -167,6 +209,24 @@ struct ItineraryView: View {
             } catch {
                 Logger.error("Error fetching default hotel: \(error.localizedDescription)")
             }
+            
+            // Generate transit routes
+            do {
+                Logger.info("Generating transit routes for \(city.name)")
+                
+                let transitRoutes = try await TransitService.shared.generateTransitRoutes(
+                    tripSchedule: tripSchedule,
+                    destinationCity: city,
+                    selectedHotels: selectedHotels,
+                    attractions: fetchedAttractions
+                )
+                await MainActor.run {
+                    self.transitDays = transitRoutes
+                }
+                Logger.success("Generated \(transitRoutes.count) transit days")
+            } catch {
+                Logger.error("Error generating transit routes: \(error.localizedDescription)")
+            }
         } catch {
             Logger.error("Error loading attractions: \(error)")
             self.error = error
@@ -179,8 +239,67 @@ struct ItineraryView: View {
         let attractionsPerDay = Int(ceil(Double(attractions.count) / Double(numberOfDays)))
         let startIndex = dayIndex * attractionsPerDay
         let endIndex = min(startIndex + attractionsPerDay, attractions.count)
+        guard startIndex < attractions.count else { return [] }
         return Array(attractions[startIndex..<endIndex])
     }
+    
+    private func transitRoutesForDay(_ day: Int) -> [TransitRoute] {
+        let calendar = Calendar.current
+        let date = dateForDay(day - 1)
+        return transitDays.first { calendar.isDate($0.date, inSameDayAs: date) }?.routes ?? []
+    }
+}
+
+struct ChronologicalDayView: View {
+    let timelineItems: [UnifiedTimelineItem]
+    var body: some View {
+        ForEach(timelineItems) { item in
+            switch item {
+            case .attraction(let attraction, let start, let end):
+                AttractionCard(attraction: attraction, timeSlot: TimeSlot(startTime: start, endTime: end))
+            case .hotel(let hotel, _, _):
+                HotelCard(hotel: hotel, schedule: nil as HotelSchedule?, onHotelChange: nil, onImageTap: nil)
+            case .transit(let route, _, _):
+                TransitCard(route: route)
+            case .meal(let name, let start, let end):
+                HStack {
+                    Image(systemName: name == "Breakfast" ? "sunrise.fill" : name == "Lunch" ? "fork.knife" : "moon.stars.fill")
+                        .foregroundColor(.gray)
+                        .font(.title2)
+                    Text(name)
+                        .font(.headline)
+                    Spacer()
+                    Text(formattedTimeRange(start, end))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .padding(8)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            case .sleep(let start, let end):
+                HStack {
+                    Image(systemName: "bed.double.fill")
+                        .foregroundColor(.blue.opacity(0.5))
+                        .font(.title2)
+                    Text("Sleep")
+                        .font(.headline)
+                    Spacer()
+                    Text(formattedTimeRange(start, end))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .padding(8)
+                .background(Color(.systemGray5))
+                .cornerRadius(10)
+            }
+        }
+    }
+}
+
+private func formattedTimeRange(_ start: Date, _ end: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.timeStyle = .short
+    return "\(formatter.string(from: start)) - \(formatter.string(from: end))"
 }
 
 // DayItineraryView displays a single day's itinerary with morning and afternoon activities.
@@ -192,6 +311,7 @@ struct DayItineraryView: View {
     let attractions: [TouristAttraction]
     let city: City
     @Binding var selectedHotel: Hotel?
+    let transitRoutes: [TransitRoute]
     let onHotelSelect: (Int) -> Void
     let onHotelImageTap: (Hotel) -> Void
     
@@ -199,12 +319,13 @@ struct DayItineraryView: View {
     private let morningAttractions: [(attraction: TouristAttraction, timeSlot: TimeSlot)]
     private let afternoonAttractions: [(attraction: TouristAttraction, timeSlot: TimeSlot)]
     
-    init(dayNumber: Int, date: Date, attractions: [TouristAttraction], city: City, selectedHotel: Binding<Hotel?>, onHotelSelect: @escaping (Int) -> Void, onHotelImageTap: @escaping (Hotel) -> Void) {
+    init(dayNumber: Int, date: Date, attractions: [TouristAttraction], city: City, selectedHotel: Binding<Hotel?>, transitRoutes: [TransitRoute], onHotelSelect: @escaping (Int) -> Void, onHotelImageTap: @escaping (Hotel) -> Void) {
         self.dayNumber = dayNumber
         self.date = date
         self.attractions = attractions
         self.city = city
         self._selectedHotel = selectedHotel
+        self.transitRoutes = transitRoutes
         self.onHotelSelect = onHotelSelect
         self.onHotelImageTap = onHotelImageTap
         
@@ -271,6 +392,18 @@ struct DayItineraryView: View {
                 }
             }
             
+            // Transit Routes Section
+            if !transitRoutes.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Transportation")
+                        .font(.headline)
+                    
+                    ForEach(transitRoutes, id: \.id) { route in
+                        TransitCard(route: route)
+                    }
+                }
+            }
+            
             // Afternoon Section
             if !afternoonAttractions.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
@@ -303,7 +436,8 @@ struct DayItineraryView: View {
                     // Hotel card is tappable for hotel selection, image is tappable for details
                     Button(action: { onHotelSelect(dayNumber) }) {
                         HotelCard(
-                            hotel: hotel, 
+                            hotel: hotel,
+                            schedule: nil as HotelSchedule?,
                             onHotelChange: { onHotelSelect(dayNumber) },
                             onImageTap: { onHotelImageTap(hotel) }
                         )
@@ -380,7 +514,27 @@ struct DayItineraryView: View {
                 ]
             ),
             startDate: Date(),
-            endDate: Date().addingTimeInterval(86400 * 3)
+            endDate: Date().addingTimeInterval(86400 * 3),
+            homeCity: City(
+                id: UUID(),
+                name: "New York",
+                country: "USA",
+                continent: .northAmerica,
+                population: 8419000,
+                description: "New York is the most populous city in the United States.",
+                landmarks: [],
+                coordinates: City.Coordinates(latitude: 40.7128, longitude: -74.0060),
+                timezone: "America/New_York",
+                imageURLs: [],
+                facts: []
+            ),
+            tripSchedule: TripSchedule(
+                homeCity: "New York",
+                departureDate: Date(),
+                departureTime: Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date(),
+                returnDate: Date().addingTimeInterval(86400 * 3),
+                returnTime: Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date().addingTimeInterval(86400 * 3)) ?? Date()
+            )
         )
     }
 } 

@@ -165,43 +165,23 @@ struct AttractionListView: View {
         error = nil
         
         do {
-            print("Converting coordinates for \(city.name)")
-            let cityCoordinates = CLLocationCoordinate2D(
-                latitude: city.coordinates.latitude,
-                longitude: city.coordinates.longitude
-            )
+            print("Fetching tourist attractions from Google Places API")
+            let fetchedAttractions = try await GooglePlacesService.shared.fetchTouristAttractions(for: city)
+            print("Found \(fetchedAttractions.count) attractions")
             
-            print("Fetching places from Google Places API")
-            let places = try await GooglePlacesService.shared.getNearbyPlaces(
-                location: cityCoordinates,
-                types: ["tourist_attraction"]
-            )
-            
-            print("Found \(places.count) places")
-            
-            attractions = places.map { place in
-                print("Mapping place: \(place.displayName.text)")
-                let coordinates = CLLocationCoordinate2D(
-                    latitude: place.location.latitude,
-                    longitude: place.location.longitude
-                )
-                
-                let attraction = Attraction(
-                    id: place.id,
-                    name: place.displayName.text,
-                    description: place.primaryTypeDisplayName?.text ?? place.displayName.text,
-                    address: place.formattedAddress,
+            attractions = fetchedAttractions.map { ta in
+                Attraction(
+                    id: ta.id.uuidString,
+                    name: ta.name,
+                    description: ta.description,
+                    address: ta.description, // fallback, as TouristAttraction may not have address
                     rating: 0.0,
-                    imageURL: place.photos?.first?.uri ?? "",
-                    coordinates: coordinates,
-                    websiteURL: nil,
+                    imageURL: ta.imageURL,
+                    coordinates: CLLocationCoordinate2D(latitude: ta.coordinates.latitude, longitude: ta.coordinates.longitude),
+                    websiteURL: ta.websiteURL,
                     priceLevel: .moderate
                 )
-                
-                print("Mapped attraction: \(attraction.name)")
-                return attraction
             }
-            
             print("Total attractions loaded: \(attractions.count)")
         } catch {
             print("Error loading attractions: \(error.localizedDescription)")

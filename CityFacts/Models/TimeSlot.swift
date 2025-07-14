@@ -1,6 +1,6 @@
 import Foundation
 
-struct TimeSlot: Identifiable {
+struct TimeSlot: Identifiable, Codable {
     let id = UUID()
     let startTime: Date
     let endTime: Date

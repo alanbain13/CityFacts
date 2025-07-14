@@ -109,41 +109,29 @@ struct CitySearchView: View {
 }
 
 // CitySearchViewModel manages the state and logic for city search functionality.
-// It handles searching for cities using the Google Places service and manages loading states.
+// It handles searching for cities using the CityStore and manages loading states.
 // The view model provides search results and error handling for the CitySearchView.
+@MainActor
 class CitySearchViewModel: ObservableObject {
     @Published var searchResults: [City] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    private let placesService = GooglePlacesService.shared
+    private let cityStore = CityStore()
     
     func searchCities(query: String) async {
         guard !query.isEmpty else {
-            await MainActor.run {
-                searchResults = []
-            }
+            searchResults = []
             return
         }
         
-        await MainActor.run {
-            isLoading = true
-            errorMessage = nil
-        }
+        isLoading = true
+        errorMessage = nil
         
-        do {
-            let cities = try await placesService.searchCities(query: query)
-            
-            await MainActor.run {
-                searchResults = cities
-                isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = error.localizedDescription
-                isLoading = false
-            }
-        }
+        // Use CityStore's filtered cities functionality
+        cityStore.searchText = query
+        searchResults = cityStore.filteredCities
+        isLoading = false
     }
 }
 

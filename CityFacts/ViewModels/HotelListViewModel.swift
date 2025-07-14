@@ -24,7 +24,7 @@ class HotelListViewModel: ObservableObject {
                 Logger.info("Processing hotel: \(place.displayName.text)")
                 
                 // Fetch additional details including website URL
-                let details = try await GooglePlacesService.shared.getPlaceDetails(placeId: place.id)
+                let details = try await GooglePlacesService.shared.getPlaceDetails(placeId: place.placeId)
                 
                 // Determine price level based on the place's types
                 let priceLevel: Hotel.PriceLevel?
@@ -56,11 +56,11 @@ class HotelListViewModel: ObservableObject {
                     rating: nil, // Rating not available in current API
                     imageURL: imageURL,
                     coordinates: CLLocationCoordinate2D(
-                        latitude: place.location.latitude,
-                        longitude: place.location.longitude
+                        latitude: place.location.lat,
+                        longitude: place.location.lng
                     ),
                     amenities: amenities,
-                    websiteURL: details.websiteUri,
+                    websiteURL: details.website,
                     phoneNumber: nil, // Phone number not available in current API
                     priceLevel: priceLevel
                 )

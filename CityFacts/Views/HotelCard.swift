@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HotelCard: View {
     let hotel: Hotel
+    let schedule: HotelSchedule?
     var onHotelChange: (() -> Void)? = nil
     var onImageTap: (() -> Void)? = nil
 
@@ -53,6 +54,26 @@ struct HotelCard: View {
                                 .foregroundColor(.secondary)
                                 .lineLimit(2)
                         }
+                        
+                        // Hotel rating and price
+                        HStack {
+                            if let rating = hotel.rating {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "star.fill")
+                                        .foregroundColor(.yellow)
+                                        .font(.caption)
+                                    Text(String(format: "%.1f", rating))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            if let priceLevel = hotel.priceLevel {
+                                Text(priceLevel.rawValue)
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            }
+                        }
                     }
                     
                     Spacer()
@@ -68,6 +89,53 @@ struct HotelCard: View {
                                 .cornerRadius(6)
                         }
                         .buttonStyle(BorderlessButtonStyle())
+                    }
+                }
+                
+                // Hotel Schedule Information
+                if let schedule = schedule {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Hotel Schedule")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Check-in")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(schedule.formattedCheckInTime)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .center, spacing: 2) {
+                                Text("Evening Arrival")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(schedule.formattedEveningArrivalTime)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Check-out")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(schedule.formattedCheckOutTime)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
                     }
                 }
             }

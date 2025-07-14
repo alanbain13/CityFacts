@@ -4,228 +4,61 @@ import CoreLocation
 class GooglePlacesService {
     static let shared = GooglePlacesService()
     
+    private let apiKey = GooglePlacesConfig.apiKey
+    private let baseURL = "https://maps.googleapis.com/maps/api/place"
+    
     private init() {}
     
     // Search for places by text query
-    func searchPlaces(query: String, type: String? = nil) async throws -> [Place] {
-        Logger.info("Starting searchPlaces")
-        Logger.debug("Query: \(query)")
+    func searchPlaces(query: String) async throws -> [Place] {
+        let urlString = "\(baseURL)/textsearch/json?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&key=\(apiKey)"
         
-        // Construct URL using URLComponents with base URL
-        let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.searchEndpoint
-        guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            Logger.error("Failed to create URL components for endpoint: \(fullEndpoint)")
-            throw NetworkError.invalidURL
+        guard let url = URL(string: urlString) else {
+            throw PlacesAPIError.invalidURL
         }
         
-        // Add the API key as a query parameter
-        urlComponents.queryItems = [
-            URLQueryItem(name: "key", value: GooglePlacesConfig.apiKey)
-        ]
+        let (data, response) = try await URLSession.shared.data(from: url)
         
-        guard let url = urlComponents.url else {
-            Logger.error("Failed to create URL from components")
-            throw NetworkError.invalidURL
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PlacesAPIError.invalidResponse
         }
         
-        // Create request body with text query and type
-        var requestBody: [String: Any] = [
-            "textQuery": query
-        ]
-        
-        // Add locationBias if searching for hotels
-        if query.lowercased().contains("hotel") {
-            requestBody["includedType"] = "lodging"
+        guard httpResponse.statusCode == 200 else {
+            throw PlacesAPIError.httpError(httpResponse.statusCode)
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        let placesResponse = try JSONDecoder().decode(PlacesResponse.self, from: data)
         
-        // Set headers
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("places.id,places.displayName,places.formattedAddress,places.location,places.types,places.photos,places.primaryType,places.primaryTypeDisplayName,places.websiteUri,places.rating,places.priceLevel", forHTTPHeaderField: "X-Goog-FieldMask")
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        } catch {
-            Logger.error("Failed to serialize request body: \(error)")
-            throw NetworkError.apiError(message: "Failed to serialize request: \(error.localizedDescription)")
-        }
-        
-        Logger.debug("Making API Request")
-        Logger.debug("URL: \(url)")
-        
-        do {
-            Logger.debug("Starting Network Request")
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                Logger.debug("Status Code: \(httpResponse.statusCode)")
-                
-                if httpResponse.statusCode != 200 {
-                    Logger.error("API Error: HTTP \(httpResponse.statusCode)")
-                    let errorString = String(decoding: data, as: UTF8.self)
-                    Logger.error("Error details: \(errorString)")
-                    throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode): \(errorString)")
-                }
-            }
-            
-            Logger.debug("Decoding Response")
-            let decoder = JSONDecoder()
-            do {
-                let response = try decoder.decode(PlacesResponse.self, from: data)
-                Logger.success("Successfully decoded \(response.places.count) places")
-                return response.places
-            } catch {
-                Logger.error("Decoding Error: \(error)")
-                throw NetworkError.apiError(message: "Failed to decode response: \(error.localizedDescription)")
-            }
-        } catch let error as URLError {
-            Logger.error("URL Error: \(error)")
-            throw NetworkError.apiError(message: "URL Error: \(error.localizedDescription)")
-        } catch {
-            Logger.error("Network Error: \(error)")
-            throw error
+        return placesResponse.results.map { place in
+            Place(
+                placeId: place.placeId,
+                displayName: DisplayName(text: place.name),
+                formattedAddress: place.formattedAddress,
+                location: Location(lat: place.geometry.location.lat, lng: place.geometry.location.lng),
+                types: place.types,
+                photos: place.photos?.map { photo in
+                    Photo(photoURL: "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=\(photo.photoReference)&key=\(self.apiKey)")
+                } ?? []
+            )
         }
     }
     
-    // Get nearby places
-    func getNearbyPlaces(location: CLLocationCoordinate2D, radius: Int = 5000, types: [String]? = nil) async throws -> [Place] {
-        Logger.info("Getting nearby places")
-        Logger.debug("Location: \(location.latitude), \(location.longitude)")
-        Logger.debug("Radius: \(radius)")
-        Logger.debug("Types: \(types)")
-        
-        // Construct URL using URLComponents with base URL
-        let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.nearbyEndpoint
-        guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            Logger.error("Failed to create URL components for endpoint: \(fullEndpoint)")
-            throw NetworkError.invalidURL
-        }
-        
-        // Add the API key as a query parameter
-        urlComponents.queryItems = [
-            URLQueryItem(name: "key", value: GooglePlacesConfig.apiKey)
-        ]
-        
-        guard let url = urlComponents.url else {
-            Logger.error("Failed to create URL from components")
-            throw NetworkError.invalidURL
-        }
-        
-        var requestBody: [String: Any] = [
-            "locationRestriction": [
-                "circle": [
-                    "center": [
-                        "latitude": location.latitude,
-                        "longitude": location.longitude
-                    ],
-                    "radius": radius
-                ]
-            ]
-        ]
-        
-        // Add includedTypes if specified
-        if let types = types {
-            requestBody["includedTypes"] = types
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        
-        // Set headers
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("id,displayName,formattedAddress,location,types,photos.name,photos.widthPx,photos.heightPx,primaryType,primaryTypeDisplayName,websiteUri", forHTTPHeaderField: "X-Goog-FieldMask")
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        } catch {
-            Logger.error("Failed to serialize request body: \(error)")
-            throw NetworkError.apiError(message: "Failed to serialize request: \(error.localizedDescription)")
-        }
-        
-        Logger.debug("Fetching nearby places with URL: \(url)")
-        Logger.debug("Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        if let httpBody = request.httpBody,
-           let bodyString = String(data: httpBody, encoding: .utf8) {
-            Logger.debug("Request body: \(bodyString)")
-        } else {
-            Logger.debug("Request body: nil")
-        }
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                Logger.debug("HTTP Status Code: \(httpResponse.statusCode)")
-                Logger.debug("Response headers: \(httpResponse.allHeaderFields)")
-                if let responseString = String(data: data, encoding: .utf8) {
-                    Logger.debug("Raw response data: \(responseString)")
-                }
-                
-                if httpResponse.statusCode != 200 {
-                    if let errorString = String(data: data, encoding: .utf8) {
-                        throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode): \(errorString)")
-                    }
-                    throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode)")
-                }
-            }
-            
-            let decoder = JSONDecoder()
-            let placesResponse = try decoder.decode(PlacesResponse.self, from: data)
-            Logger.success("Successfully decoded \(placesResponse.places.count) nearby places")
-            return placesResponse.places
-        } catch {
-            Logger.error("Error fetching nearby places: \(error)")
-            throw error
-        }
-    }
-    
-    // Get place details
+    // Get place details by place ID
     func getPlaceDetails(placeId: String) async throws -> PlaceDetails {
-        Logger.info("Getting place details for ID: \(placeId)")
+        let urlString = "\(baseURL)/details/json?place_id=\(placeId)&fields=name,formatted_address,geometry,types,rating,user_ratings_total,price_level,opening_hours,photos,website&key=\(apiKey)"
         
-        // Construct URL using URLComponents with base URL
-        let fullEndpoint = GooglePlacesConfig.baseURL + GooglePlacesConfig.detailsEndpoint + "/" + placeId
-        guard var urlComponents = URLComponents(string: fullEndpoint) else {
-            Logger.error("Failed to create URL components for endpoint: \(fullEndpoint)")
-            throw NetworkError.invalidURL
+        guard let url = URL(string: urlString) else {
+            throw PlacesAPIError.invalidURL
         }
         
-        // Add the API key as a query parameter
-        urlComponents.queryItems = [
-            URLQueryItem(name: "key", value: GooglePlacesConfig.apiKey)
-        ]
+        let (data, response) = try await URLSession.shared.data(from: url)
         
-        guard let url = urlComponents.url else {
-            Logger.error("Failed to create URL from components")
-            throw NetworkError.invalidURL
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PlacesAPIError.invalidResponse
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(GooglePlacesConfig.apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("id,displayName,formattedAddress,location,types,photos.name,photos.widthPx,photos.heightPx,primaryType,primaryTypeDisplayName,websiteUri", forHTTPHeaderField: "X-Goog-FieldMask")
-        
-        Logger.debug("Fetching place details with URL: \(url)")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            Logger.debug("HTTP Status Code: \(httpResponse.statusCode)")
-            Logger.debug("Response headers: \(httpResponse.allHeaderFields)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                Logger.debug("Raw response data: \(responseString)")
-            }
-            
-            if httpResponse.statusCode != 200 {
-                if let errorString = String(data: data, encoding: .utf8) {
-                    throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode): \(errorString)")
-                }
-                throw NetworkError.apiError(message: "HTTP \(httpResponse.statusCode)")
-            }
+        guard httpResponse.statusCode == 200 else {
+            throw PlacesAPIError.httpError(httpResponse.statusCode)
         }
         
         return try JSONDecoder().decode(PlaceDetails.self, from: data)
@@ -262,8 +95,8 @@ class GooglePlacesService {
                     category: .historical,
                     estimatedDuration: estimateVisitDuration(type: "landmark", name: landmark.name),
                     coordinates: TouristAttraction.Coordinates(
-                        latitude: place.location.latitude,
-                        longitude: place.location.longitude
+                        latitude: place.location.lat,
+                        longitude: place.location.lng
                     ),
                     imageURL: imageURL,
                     tips: generateTips(for: .historical),
@@ -340,8 +173,8 @@ class GooglePlacesService {
                     category: category,
                     estimatedDuration: duration,
                     coordinates: TouristAttraction.Coordinates(
-                        latitude: place.location.latitude,
-                        longitude: place.location.longitude
+                        latitude: place.location.lat,
+                        longitude: place.location.lng
                     ),
                     imageURL: imageURL,
                     tips: generateTips(for: category),
@@ -513,289 +346,166 @@ class GooglePlacesService {
     
     // Find the best hotel in a city
     func findBestHotel(in city: City) async throws -> Hotel? {
-        Logger.info("Finding Best Hotel in \(city.name)")
-        
-        let searchQuery = "best luxury hotel in \(city.name)"
+        let searchQuery = "best hotels in \(city.name)"
         let places = try await searchPlaces(query: searchQuery)
         
-        guard let bestHotel = places.first else {
-            Logger.warning("No hotels found in \(city.name)")
+        guard let bestPlace = places.first else {
             return nil
         }
         
-        // Get additional details for the hotel
-        let details = try await getPlaceDetails(placeId: bestHotel.id)
+        // Get detailed information about the hotel
+        let details = try await getPlaceDetails(placeId: bestPlace.placeId)
         
-        // Determine price level based on the place's types
-        let priceLevel: Hotel.PriceLevel?
-        if bestHotel.types.contains("luxury") {
-            priceLevel = .ultraLuxury
-        } else if bestHotel.types.contains("upscale") {
-            priceLevel = .luxury
-        } else if bestHotel.types.contains("budget") {
-            priceLevel = .budget
-        } else {
-            priceLevel = .moderate
-        }
-        
-        // Get amenities based on place types
-        var amenities = ["Wi-Fi", "Air Conditioning"]
-        if bestHotel.types.contains("spa") { amenities.append("Spa") }
-        if bestHotel.types.contains("restaurant") { amenities.append("Restaurant") }
-        if bestHotel.types.contains("fitness_center") { amenities.append("Fitness Center") }
-        if bestHotel.types.contains("swimming_pool") { amenities.append("Swimming Pool") }
-        
-        // Get the first photo URL or use a default image
-        let imageURL = bestHotel.photos?.first?.photoURL
-        
-        let hotel = Hotel(
+        return Hotel(
             id: UUID(),
-            name: bestHotel.displayName.text,
-            description: "Experience luxury and comfort at \(bestHotel.displayName.text), one of \(city.name)'s finest hotels.",
-            address: bestHotel.formattedAddress,
-            rating: nil, // Rating not available in the current API response
-            imageURL: imageURL,
+            name: details.name,
+            description: "A highly-rated hotel in \(city.name)",
+            address: details.formattedAddress,
+            rating: details.rating,
+            imageURL: details.photos?.first?.photoReference,
             coordinates: CLLocationCoordinate2D(
-                latitude: bestHotel.location.latitude,
-                longitude: bestHotel.location.longitude
+                latitude: details.geometry.location.lat,
+                longitude: details.geometry.location.lng
             ),
-            amenities: amenities,
-            websiteURL: details.websiteUri,
-            phoneNumber: nil, // Phone number not available in the current API response
-            priceLevel: priceLevel
+            amenities: ["WiFi", "Restaurant", "Room Service", "Fitness Center"],
+            websiteURL: details.website,
+            phoneNumber: nil,
+            priceLevel: mapGooglePriceLevel(details.priceLevel)
         )
-        
-        Logger.success("Successfully created hotel: \(hotel.name)")
-        return hotel
     }
     
-    // Add this enum before the searchCities method
-    enum GooglePlacesError: Error {
-        case invalidURL
-        case invalidResponse
-        case decodingError
-    }
-    
-    /// Searches for cities using the Google Places API
-    /// - Parameter query: The search query for the city
-    /// - Returns: An array of City objects matching the search query
-    func searchCities(query: String) async throws -> [City] {
-        Logger.info("Starting searchCities")
-        Logger.debug("Query: \(query)")
-        
-        let places = try await searchPlaces(query: query)
-        
-        // Filter places to only include cities and convert them to City objects
-        let cities = places.compactMap { place -> City? in
-            // Check if the place is a city (locality or administrative_area_level_1)
-            guard place.types.contains("locality") || place.types.contains("administrative_area_level_1") else {
-                return nil
-            }
-            
-            let country = place.formattedAddress.components(separatedBy: ",").last?.trimmingCharacters(in: .whitespaces) ?? ""
-            
-            // Create a City object
-            return City(
-                id: UUID(),
-                name: place.displayName.text,
-                country: country,
-                continent: determineContinent(from: country),
-                population: 0, // This would need to be fetched from another API
-                description: "",
-                landmarks: [],
-                coordinates: City.Coordinates(latitude: place.location.latitude, longitude: place.location.longitude),
-                timezone: "", // This would need to be determined based on coordinates
-                imageURLs: place.photos?.compactMap { $0.photoURL } ?? [],
-                facts: []
-            )
+    private func mapGooglePriceLevel(_ priceLevel: Int?) -> Hotel.PriceLevel {
+        switch priceLevel {
+        case 0, 1: return .budget
+        case 2: return .moderate
+        case 3: return .luxury
+        case 4: return .ultraLuxury
+        default: return .moderate
         }
-        
-        Logger.success("Found \(cities.count) cities")
-        return cities
-    }
-    
-    // Helper function to determine continent from country
-    private func determineContinent(from country: String) -> CityStore.Continent {
-        let lowercasedCountry = country.lowercased()
-        
-        // North America
-        if ["united states", "canada", "mexico", "usa", "us"].contains(where: { lowercasedCountry.contains($0) }) {
-            return .northAmerica
-        }
-        
-        // South America
-        if ["brazil", "argentina", "chile", "peru", "colombia", "venezuela"].contains(where: { lowercasedCountry.contains($0) }) {
-            return .southAmerica
-        }
-        
-        // Europe
-        if ["france", "germany", "italy", "spain", "uk", "united kingdom", "netherlands", "switzerland", "sweden", "norway", "denmark", "finland", "austria", "belgium", "portugal", "greece", "ireland", "poland", "czech", "hungary"].contains(where: { lowercasedCountry.contains($0) }) {
-            return .europe
-        }
-        
-        // Asia
-        if ["china", "japan", "india", "korea", "thailand", "vietnam", "malaysia", "singapore", "indonesia", "philippines", "taiwan", "hong kong", "turkey", "israel", "uae", "saudi arabia", "qatar"].contains(where: { lowercasedCountry.contains($0) }) {
-            return .asia
-        }
-        
-        // Africa
-        if ["south africa", "egypt", "morocco", "nigeria", "kenya", "ethiopia", "ghana", "tanzania", "uganda"].contains(where: { lowercasedCountry.contains($0) }) {
-            return .africa
-        }
-        
-        // Oceania
-        if ["australia", "new zealand", "fiji", "samoa", "tonga"].contains(where: { lowercasedCountry.contains($0) }) {
-            return .oceania
-        }
-        
-        // Default to Europe if we can't determine
-        return .europe
     }
 }
 
-// Response models for Places API (New)
+// MARK: - API Response Models
+
 struct PlacesResponse: Codable {
-    let places: [Place]
-    
-    enum CodingKeys: String, CodingKey {
-        case places
-    }
+    let results: [PlaceResult]
+    let status: String
 }
 
-struct Place: Codable {
-    let id: String
-    let displayName: DisplayName
+struct PlaceResult: Codable {
+    let placeId: String
+    let name: String
     let formattedAddress: String
-    let location: Location
+    let geometry: Geometry
     let types: [String]
-    let photos: [Photo]?
-    let primaryType: String?
-    let primaryTypeDisplayName: DisplayName?
+    let rating: Double?
+    let userRatingsTotal: Int?
+    let priceLevel: Int?
+    let openingHours: OpeningHours?
+    let photos: [PhotoResult]?
+    let website: String?
     
     enum CodingKeys: String, CodingKey {
-        case id
-        case displayName = "displayName"
-        case formattedAddress = "formattedAddress"
-        case location
+        case placeId = "place_id"
+        case name
+        case formattedAddress = "formatted_address"
+        case geometry
         case types
+        case rating
+        case userRatingsTotal = "user_ratings_total"
+        case priceLevel = "price_level"
+        case openingHours = "opening_hours"
         case photos
-        case primaryType = "primaryType"
-        case primaryTypeDisplayName = "primaryTypeDisplayName"
+        case website
     }
 }
 
-struct DisplayName: Codable {
-    let text: String
-    let languageCode: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case text
-        case languageCode = "languageCode"
-    }
+struct Geometry: Codable {
+    let location: Location
 }
 
 struct Location: Codable {
-    let latitude: Double
-    let longitude: Double
+    let lat: Double
+    let lng: Double
+}
+
+struct OpeningHours: Codable {
+    let openNow: Bool
     
     enum CodingKeys: String, CodingKey {
-        case latitude
-        case longitude
+        case openNow = "open_now"
     }
 }
 
-struct Photo: Codable {
-    let name: String
-    let uri: String?
-    let widthPx: Int?
-    let heightPx: Int?
+struct PhotoResult: Codable {
+    let photoReference: String
     
     enum CodingKeys: String, CodingKey {
-        case name
-        case uri
-        case widthPx = "widthPx"
-        case heightPx = "heightPx"
-    }
-    
-    var photoURL: String? {
-        // Correct format for Places API v1
-        let baseURL = "https://places.googleapis.com/v1"
-        let maxHeight = 800
-        let photoURL = "\(baseURL)/\(name)/media?maxHeightPx=\(maxHeight)&key=\(GooglePlacesConfig.apiKey)"
-        Logger.debug("Generated v1 photo URL: \(photoURL)")
-        return photoURL
+        case photoReference = "photo_reference"
     }
 }
 
 struct PlaceDetails: Codable {
-    let id: String
+    let name: String
+    let formattedAddress: String
+    let geometry: Geometry
+    let types: [String]
+    let rating: Double?
+    let userRatingsTotal: Int?
+    let priceLevel: Int?
+    let openingHours: OpeningHours?
+    let photos: [PhotoResult]?
+    let website: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case name
+        case formattedAddress = "formatted_address"
+        case geometry
+        case types
+        case rating
+        case userRatingsTotal = "user_ratings_total"
+        case priceLevel = "price_level"
+        case openingHours = "opening_hours"
+        case photos
+        case website
+    }
+}
+
+// MARK: - App Models
+
+struct Place {
+    let placeId: String
     let displayName: DisplayName
     let formattedAddress: String
     let location: Location
     let types: [String]
     let photos: [Photo]?
-    let primaryType: String?
-    let primaryTypeDisplayName: DisplayName?
-    let websiteUri: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case displayName = "displayName"
-        case formattedAddress = "formattedAddress"
-        case location
-        case types
-        case photos
-        case primaryType = "primaryType"
-        case primaryTypeDisplayName = "primaryTypeDisplayName"
-        case websiteUri = "websiteUri"
-    }
 }
 
-struct Review: Codable {
-    let authorName: String
-    let rating: Double
+struct DisplayName {
     let text: String
-    let time: Int
+}
+
+struct Photo {
+    let photoURL: String
+}
+
+enum PlacesAPIError: Error, LocalizedError {
+    case invalidURL
+    case invalidResponse
+    case httpError(Int)
+    case decodingError
     
-    enum CodingKeys: String, CodingKey {
-        case authorName = "author_name"
-        case rating
-        case text
-        case time
-    }
-}
-
-struct OpeningHours: Codable {
-    let isOpen: Bool
-    let periods: [Period]?
-    
-    enum CodingKeys: String, CodingKey {
-        case isOpen = "open_now"
-        case periods
-    }
-}
-
-struct Period: Codable {
-    let open: Time
-    let close: Time?
-}
-
-struct Time: Codable {
-    let day: Int
-    let time: String
-}
-
-// Add this structure for decoding the autocomplete response
-struct PlacesAutocompleteResponse: Codable {
-    let predictions: [Prediction]
-    
-    struct Prediction: Codable {
-        let description: String
-        let placeId: String
-        
-        enum CodingKeys: String, CodingKey {
-            case description
-            case placeId = "place_id"
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL"
+        case .invalidResponse:
+            return "Invalid response"
+        case .httpError(let code):
+            return "HTTP error: \(code)"
+        case .decodingError:
+            return "Failed to decode response"
         }
     }
 } 

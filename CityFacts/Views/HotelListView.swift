@@ -19,7 +19,7 @@ struct HotelListView: View {
                     Text("Currently Selected Hotel")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    HotelCard(hotel: selected)
+                    HotelCard(hotel: selected, schedule: nil as HotelSchedule?, onHotelChange: nil, onImageTap: nil)
                         .overlay(
                             Text("Selected")
                                 .font(.caption2)
@@ -51,7 +51,7 @@ struct HotelListView: View {
                             city: city,
                             selectedHotel: $selectedHotel
                         )) {
-                            HotelCard(hotel: hotel)
+                            HotelCard(hotel: hotel, schedule: nil as HotelSchedule?, onHotelChange: nil, onImageTap: nil)
                         }
                         .buttonStyle(PlainButtonStyle())
                         
