@@ -15,6 +15,7 @@ struct ItineraryCalendarView: View {
     @State private var error: Error?
     @State private var showingExportSheet = false
     @State private var exportedXML: String = ""
+    @StateObject private var cityStore = CityStore(isPremiumUser: false) // <-- Added CityStore
     @Environment(\.dismiss) private var dismiss
     
     private var numberOfDays: Int {
@@ -56,6 +57,7 @@ struct ItineraryCalendarView: View {
         let timeline = TimelineDependencyResolver.generateTimeline(
             tripInfo: tripInfo,
             attractions: attractions,
+            venues: cityStore.localDataService?.getVenues(for: city.id.uuidString) ?? [], // <-- Safely unwrap optional
             transitDays: transitDays,
             selectedHotels: selectedHotels
         )
@@ -81,6 +83,7 @@ struct ItineraryCalendarView: View {
                         let timelineItems = PersonalAvailabilityCalendar.generateChronologicalTimeline(
                             dayDate: dateForDay(dayIndex),
                             attractions: attractionsForDay(dayIndex),
+                            venues: cityStore.localDataService?.getVenues(for: city.id.uuidString) ?? [], // <-- Safely unwrap optional
                             transitRoutes: transitRoutesForDay(day),
                             hotel: self.selectedHotels[day] ?? nil
                         )
@@ -452,6 +455,8 @@ struct TimelineEventRow: View {
             return "fork.knife"
         case .sleep:
             return "moon.fill"
+        case .venue:
+            return "building.2.crop.circle.fill"
         }
     }
     
@@ -467,6 +472,8 @@ struct TimelineEventRow: View {
             return .orange
         case .sleep:
             return .indigo
+        case .venue:
+            return .red
         }
     }
     
@@ -482,6 +489,8 @@ struct TimelineEventRow: View {
             return mealType.capitalized
         case .sleep(_, _):
             return "Sleep"
+        case .venue(let venue, _, _):
+            return venue.name
         }
     }
     
@@ -497,6 +506,8 @@ struct TimelineEventRow: View {
             return "Meal time"
         case .sleep(_, _):
             return "Rest time"
+        case .venue(let venue, _, _):
+            return venue.category ?? "Venue"
         }
     }
     
@@ -557,7 +568,7 @@ struct TimelineEventRow: View {
             landmarks: [],
             coordinates: City.Coordinates(latitude: 48.8566, longitude: 2.3522),
             timezone: "Europe/Paris",
-            imageURLs: [],
+            imageURL: nil,
             facts: []
         ),
         startDate: Date(),
@@ -572,7 +583,7 @@ struct TimelineEventRow: View {
             landmarks: [],
             coordinates: City.Coordinates(latitude: 40.7128, longitude: -74.0060),
             timezone: "America/New_York",
-            imageURLs: [],
+            imageURL: nil,
             facts: []
         ),
         tripSchedule: TripSchedule(

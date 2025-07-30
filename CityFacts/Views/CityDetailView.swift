@@ -147,8 +147,8 @@ struct CityDetailView: View {
     
     private var imageGallery: some View {
         TabView {
-            ForEach(city.imageURLs, id: \.self) { url in
-                AsyncImage(url: URL(string: url)) { image in
+            if let imageURL = city.imageURL {
+                AsyncImage(url: URL(string: imageURL)) { image in
                     image
                         .resizable()
                         .scaledToFill()

@@ -6,7 +6,7 @@ import MapKit
 // The view integrates with the CityStore to fetch and display city data.
 struct CitySearchView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = CitySearchViewModel()
+    @StateObject private var cityStore = CityStore(isPremiumUser: false)
     @State private var searchText = ""
     @State private var selectedCity: City?
     @State private var showingCityDetail = false
@@ -26,21 +26,11 @@ struct CitySearchView: View {
                     
                     TextField("Search for any city...", text: $searchText)
                         .autocorrectionDisabled()
-                        .onChange(of: searchText) { newValue in
-                            if !newValue.isEmpty {
-                                Task {
-                                    await viewModel.searchCities(query: newValue)
-                                }
-                            } else {
-                                viewModel.searchResults = []
-                            }
-                        }
                     
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                            viewModel.searchResults = []
-                        } label: {
+                                            if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.gray)
                         }
@@ -52,11 +42,12 @@ struct CitySearchView: View {
                 .padding(.horizontal)
                 
                 // Results list
-                if viewModel.isLoading {
-                    Spacer()
-                    ProgressView("Searching...")
-                    Spacer()
-                } else if viewModel.searchResults.isEmpty && !searchText.isEmpty {
+                let filteredCities = searchText.isEmpty ? cityStore.cities : cityStore.cities.filter { city in
+                    city.name.localizedCaseInsensitiveContains(searchText) ||
+                    city.country.localizedCaseInsensitiveContains(searchText)
+                }
+                
+                if filteredCities.isEmpty && !searchText.isEmpty {
                     Spacer()
                     VStack(spacing: 16) {
                         Image(systemName: "magnifyingglass")
@@ -71,7 +62,7 @@ struct CitySearchView: View {
                     Spacer()
                 } else {
                     List {
-                        ForEach(viewModel.searchResults) { city in
+                        ForEach(filteredCities) { city in
                             Button {
                                 selectedCityBinding = city
                                 dismiss()

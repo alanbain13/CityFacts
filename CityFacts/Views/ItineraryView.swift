@@ -19,6 +19,7 @@ struct ItineraryView: View {
     @State private var showingHotelDetail = false
     @State private var selectedHotelForDetail: Hotel? = nil
     @State private var showingCalendarView = false
+    @StateObject private var cityStore = CityStore(isPremiumUser: false) // <-- Added CityStore
     @Environment(\.dismiss) private var dismiss
     
     private var numberOfDays: Int {
@@ -60,6 +61,7 @@ struct ItineraryView: View {
                             let timelineItems = PersonalAvailabilityCalendar.generateChronologicalTimeline(
                                 dayDate: dateForDay(dayIndex),
                                 attractions: attractionsForDay(dayIndex),
+                                venues: cityStore.localDataService?.getVenues(for: city.id.uuidString) ?? [], // <-- Safely unwrap optional
                                 transitRoutes: transitRoutesForDay(day),
                                 hotel: self.selectedHotels[day] ?? nil
                             )
@@ -291,6 +293,26 @@ struct ChronologicalDayView: View {
                 .padding(8)
                 .background(Color(.systemGray5))
                 .cornerRadius(10)
+            case .venue(let venue, let start, let end):
+                HStack {
+                    Image(systemName: "building.2.fill")
+                        .foregroundColor(.orange)
+                        .font(.title2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(venue.name)
+                            .font(.headline)
+                        Text(venue.category ?? "Venue")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Text(formattedTimeRange(start, end))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .padding(8)
+                .background(Color(.systemOrange).opacity(0.1))
+                .cornerRadius(10)
             }
         }
     }
@@ -506,7 +528,7 @@ struct DayItineraryView: View {
                 ],
                 coordinates: City.Coordinates(latitude: 48.8566, longitude: 2.3522),
                 timezone: "Europe/Paris",
-                imageURLs: ["paris_1", "paris_2", "paris_3"],
+                imageURL: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf",
                 facts: [
                     "Paris is often called the City of Light (la Ville Lumière)",
                     "The Louvre is the world's largest art museum",
@@ -525,7 +547,7 @@ struct DayItineraryView: View {
                 landmarks: [],
                 coordinates: City.Coordinates(latitude: 40.7128, longitude: -74.0060),
                 timezone: "America/New_York",
-                imageURLs: [],
+                imageURL: nil,
                 facts: []
             ),
             tripSchedule: TripSchedule(

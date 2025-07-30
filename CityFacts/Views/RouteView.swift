@@ -378,7 +378,7 @@ struct MapLocation: Identifiable {
                 landmarks: [],
                 coordinates: City.Coordinates(latitude: 48.8566, longitude: 2.3522),
                 timezone: "Europe/Paris",
-                imageURLs: [],
+                imageURL: nil,
                 facts: []
             )
         )

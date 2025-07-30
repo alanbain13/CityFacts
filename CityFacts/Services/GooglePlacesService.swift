@@ -1,17 +1,26 @@
 import Foundation
 import CoreLocation
 
-class GooglePlacesService {
+class GooglePlacesService: ObservableObject, PlacesServiceProtocol {
+    @Published var isLoading = false
+    @Published var error: String?
+    
+    private var attractions: [Attraction] = []
+    private var hotels: [Hotel] = []
     static let shared = GooglePlacesService()
     
     private let apiKey = GooglePlacesConfig.apiKey
     private let baseURL = "https://maps.googleapis.com/maps/api/place"
     
-    private init() {}
+    init() {}
     
     // Search for places by text query
     func searchPlaces(query: String) async throws -> [Place] {
         let urlString = "\(baseURL)/textsearch/json?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&key=\(apiKey)"
+        
+        print("🔍 Google Places API call:")
+        print("  URL: \(urlString)")
+        print("  API Key: \(apiKey.prefix(10))...")
         
         guard let url = URL(string: urlString) else {
             throw PlacesAPIError.invalidURL
@@ -24,10 +33,16 @@ class GooglePlacesService {
         }
         
         guard httpResponse.statusCode == 200 else {
+            print("❌ Google Places API error: HTTP \(httpResponse.statusCode)")
+            if let errorData = String(data: data, encoding: .utf8) {
+                print("  Error response: \(errorData)")
+            }
             throw PlacesAPIError.httpError(httpResponse.statusCode)
         }
         
+        print("✅ Google Places API success: HTTP \(httpResponse.statusCode)")
         let placesResponse = try JSONDecoder().decode(PlacesResponse.self, from: data)
+        print("📊 Found \(placesResponse.results.count) places")
         
         return placesResponse.results.map { place in
             Place(
@@ -507,5 +522,92 @@ enum PlacesAPIError: Error, LocalizedError {
         case .decodingError:
             return "Failed to decode response"
         }
+    }
+}
+
+// MARK: - PlacesServiceProtocol Methods
+
+extension GooglePlacesService {
+    func searchAttractions(near location: CLLocationCoordinate2D, radius: Double) async throws -> [Attraction] {
+        isLoading = true
+        error = nil
+        
+        do {
+            let query = "tourist attractions"
+            let places = try await searchPlaces(query: query)
+            
+            let attractions = places.compactMap { place in
+                Attraction(
+                    id: place.placeId,
+                    name: place.displayName.text,
+                    description: "Tourist attraction",
+                    address: place.formattedAddress,
+                    rating: 0.0, // Not available in basic search
+                    imageURL: place.photos?.first?.photoURL ?? "",
+                    coordinates: CLLocationCoordinate2D(
+                        latitude: place.location.lat,
+                        longitude: place.location.lng
+                    ),
+                    websiteURL: nil,
+                    priceLevel: .moderate,
+                    category: .historical,
+                    estimatedDuration: 120,
+                    tips: []
+                )
+            }
+            
+            self.attractions = attractions
+            isLoading = false
+            return attractions
+        } catch {
+            self.error = error.localizedDescription
+            isLoading = false
+            throw error
+        }
+    }
+    
+    func searchHotels(near location: CLLocationCoordinate2D, radius: Double) async throws -> [Hotel] {
+        isLoading = true
+        error = nil
+        
+        do {
+            let query = "hotels"
+            let places = try await searchPlaces(query: query)
+            
+            let hotels = places.compactMap { place in
+                Hotel(
+                    id: UUID(),
+                    name: place.displayName.text,
+                    description: "Hotel accommodation",
+                    address: place.formattedAddress,
+                    rating: nil,
+                    imageURL: place.photos?.first?.photoURL,
+                    coordinates: CLLocationCoordinate2D(
+                        latitude: place.location.lat,
+                        longitude: place.location.lng
+                    ),
+                    amenities: [],
+                    websiteURL: nil,
+                    phoneNumber: nil,
+                    priceLevel: .moderate
+                )
+            }
+            
+            self.hotels = hotels
+            isLoading = false
+            return hotels
+        } catch {
+            self.error = error.localizedDescription
+            isLoading = false
+            throw error
+        }
+    }
+    
+    func getAttractions(for cityId: String) -> [Attraction] {
+        return attractions
+    }
+    
+    func getHotels(for cityId: String) -> [Hotel] {
+        return hotels
     }
 } 

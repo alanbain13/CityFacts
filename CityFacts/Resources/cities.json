@@ -1,0 +1,80 @@
+[
+  {
+    "id": "new_york_usa",
+    "name": "New York",
+    "country": "USA",
+    "latitude": 40.7127281,
+    "longitude": -74.0060152,
+    "population": null,
+    "description": "City in USA",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/New_York",
+    "wikipedia_extract": "New York most commonly refers to:New York (state), a state in the northeastern United States\nNew York City, the most populous city in the United States, located in the state of New York",
+    "wikipedia_summary": null,
+    "image_url": null
+  },
+  {
+    "id": "london_uk",
+    "name": "London",
+    "country": "UK",
+    "latitude": 51.5074456,
+    "longitude": -0.1277653,
+    "population": null,
+    "description": "City in UK",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/London",
+    "wikipedia_extract": "London is the capital and largest city of both England and the United Kingdom, with a population of 8,945,309 in 2023. Its wider metropolitan area is the largest in Western Europe, with a population of 15.1\u00a0million. London stands on the River Thames in southeast England, at the head of a 50-mile (80\u00a0km) tidal estuary down to the North Sea, and has been a major settlement for nearly 2,000\u00a0years. Its ancient core and financial centre, the City of London, was founded by the Romans as Londinium and has retained its medieval boundaries. The City of Westminster, to the west of the City of London, has been the centuries-long host of the national government and parliament. London grew rapidly in the 19th century, becoming the world's largest city at the time. Since the 19th century the name \"London\" has referred to the metropolis around the City of London, historically split between the counties of Middlesex, Essex, Surrey, Kent and Hertfordshire, which since 1965 has largely comprised the administrative area of Greater London, governed by 33 local authorities and the Greater London Authority.",
+    "wikipedia_summary": null,
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/London_Skyline_%28125508655%29.jpeg/330px-London_Skyline_%28125508655%29.jpeg"
+  },
+  {
+    "id": "paris_france",
+    "name": "Paris",
+    "country": "France",
+    "latitude": 48.8588897,
+    "longitude": 2.320041,
+    "population": null,
+    "description": "City in France",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/Paris",
+    "wikipedia_extract": "Paris is the capital and largest city of France. With an estimated population of 2,048,472 in January 2025 in an area of more than 105\u00a0km2 (41\u00a0sq\u00a0mi), Paris is the fourth-most populous city in the European Union and the 30th most densely populated city in the world in 2022. Since the 17th century, Paris has been one of the world's major centres of finance, diplomacy, commerce, culture, fashion, and gastronomy. Because of its leading role in the arts and sciences and its early adoption of extensive street lighting, Paris became known as the City of Light in the 19th century.",
+    "wikipedia_summary": null,
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques%2C_Paris_ao%C3%BBt_2014_%282%29.jpg/330px-La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques%2C_Paris_ao%C3%BBt_2014_%282%29.jpg"
+  },
+  {
+    "id": "tokyo_japan",
+    "name": "Tokyo",
+    "country": "Japan",
+    "latitude": 35.6768601,
+    "longitude": 139.7638947,
+    "population": null,
+    "description": "City in Japan",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/Tokyo",
+    "wikipedia_extract": "Tokyo, officially the Tokyo Metropolis, is the capital and most populous city in Japan. With a population of over 14 million in the city proper in 2023, it is one of the most populous urban areas in the world. The Greater Tokyo Area, which includes Tokyo and parts of six neighboring prefectures, is the most populous metropolitan area in the world, with 41 million residents as of 2024.",
+    "wikipedia_summary": null,
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Skyscrapers_of_Shinjuku_2009_January.jpg/330px-Skyscrapers_of_Shinjuku_2009_January.jpg"
+  },
+  {
+    "id": "sydney_australia",
+    "name": "Sydney",
+    "country": "Australia",
+    "latitude": -33.8698439,
+    "longitude": 151.2082848,
+    "population": null,
+    "description": "City in Australia",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/Sydney",
+    "wikipedia_extract": "Sydney is the capital city of the state of New South Wales and the most populous city in Australia. Located on Australia's east coast, the metropolis surrounds Sydney Harbour and extends about 80\u00a0km (50\u00a0mi) from the Pacific Ocean in the east to the Blue Mountains in the west, and about 80\u00a0km (50\u00a0mi) from Ku-ring-gai Chase National Park and the Hawkesbury River in the north and north-west, to the Royal National Park and Macarthur in the south and south-west. Greater Sydney consists of 658 suburbs, spread across 33 local government areas. Residents of the city are colloquially known as \"Sydneysiders\". The estimated population in June 2024 was 5,557,233, which is about 66% of the state's population. The city's nicknames include the Emerald City and the Harbour City.",
+    "wikipedia_summary": null,
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Sydney_Opera_House_and_Harbour_Bridge_Dusk_%282%29_2019-06-21.jpg/330px-Sydney_Opera_House_and_Harbour_Bridge_Dusk_%282%29_2019-06-21.jpg"
+  },
+  {
+    "id": "rome_italy",
+    "name": "Rome",
+    "country": "Italy",
+    "latitude": 41.8933203,
+    "longitude": 12.4829321,
+    "population": null,
+    "description": "City in Italy",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/Rome",
+    "wikipedia_extract": "Rome is the capital city and most populated comune (municipality) of Italy. It is also the administrative centre of the Lazio region and of the Metropolitan City of Rome. A special comune named Roma Capitale with 2,746,984 residents in 1,287.36\u00a0km2 (497.1\u00a0sq\u00a0mi), Rome is the third most populous city in the European Union by population within city limits. The Metropolitan City of Rome Capital, with a population of 4,223,885 residents, is the most populous metropolitan city in Italy. Its metropolitan area is the third-most populous within Italy. Rome is located in the central-western portion of the Italian Peninsula, within Lazio (Latium), along the shores of the Tiber Valley. Vatican City is an independent country inside the city boundaries of Rome, the only existing example of a country within a city. Rome is often referred to as the City of Seven Hills due to its geography, and also as the \"Eternal City\". Rome is generally considered to be one of the cradles of Western civilization and Western Christian culture, and the centre of the Catholic Church.",
+    "wikipedia_summary": null,
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Trevi_Fountain%2C_Rome%2C_Italy_2_-_May_2007.jpg/330px-Trevi_Fountain%2C_Rome%2C_Italy_2_-_May_2007.jpg"
+  }
+]

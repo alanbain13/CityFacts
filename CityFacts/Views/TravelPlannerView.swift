@@ -6,6 +6,7 @@ import MapKit
 // Users can select a city to view detailed information and plan their route.
 struct TravelPlannerView: View {
     @StateObject private var viewModel = TravelPlannerViewModel()
+    @StateObject private var cityStore = CityStore(isPremiumUser: false)
     @State private var selectedCity: City?
     @State private var homeCity: City?
     @State private var showingCitySearch = false
@@ -13,6 +14,8 @@ struct TravelPlannerView: View {
     @State private var showingItinerary = false
     @State private var showingRoute = false
     @State private var userLocation: CLLocationCoordinate2D?
+    @State private var currentItinerary: LocalTripSchedule?
+    @State private var itineraryService: LocalItineraryService?
     
     var body: some View {
         NavigationStack {
@@ -189,7 +192,9 @@ struct TravelPlannerView: View {
                     
                     // Generate button
                     Button {
-                        showingItinerary = true
+                        if let city = selectedCity {
+                            generateItinerary(for: city)
+                        }
                     } label: {
                         Text("Generate Itinerary")
                             .font(.headline)
@@ -214,18 +219,9 @@ struct TravelPlannerView: View {
                 CitySearchView(selectedCity: $homeCity)
             }
             .sheet(isPresented: $showingItinerary) {
-                if let city = selectedCity, let homeCity = homeCity {
+                if let itinerary = currentItinerary {
                     NavigationStack {
-                        ItineraryView(
-                            city: city, 
-                            startDate: viewModel.startDate, 
-                            endDate: viewModel.endDate,
-                            homeCity: homeCity,
-                            tripSchedule: viewModel.createTripSchedule(homeCity: homeCity)
-                        )
-                        .onAppear {
-                            print("[\(Date())] ItineraryView sheet appeared")
-                        }
+                        LocalItineraryDetailView(itinerary: itinerary)
                     }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
@@ -255,6 +251,26 @@ struct TravelPlannerView: View {
                 
                 if let location = locationManager.location?.coordinate {
                     userLocation = location
+                }
+            }
+        }
+    }
+    
+    private func generateItinerary(for city: City) {
+        guard let localService = cityStore.localDataService else {
+            print("❌ LocalDataService not available")
+            return
+        }
+        
+        itineraryService = LocalItineraryService(localDataService: localService)
+        
+        Task {
+            if let service = itineraryService {
+                let itinerary = await service.generateItinerary(for: city, days: viewModel.numberOfDays)
+                
+                await MainActor.run {
+                    currentItinerary = itinerary
+                    showingItinerary = true
                 }
             }
         }

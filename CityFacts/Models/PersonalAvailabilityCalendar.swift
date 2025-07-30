@@ -8,7 +8,7 @@ struct AvailabilitySlot: Identifiable, Codable {
     let type: SlotType
     
     enum SlotType: String, Codable {
-        case meal, sleep, available
+        case meal, sleep, available, venue // Added .venue
     }
 }
 
@@ -17,12 +17,14 @@ struct PersonalAvailabilityCalendar: Codable {
     
     static func defaultCalendar() -> PersonalAvailabilityCalendar {
         return PersonalAvailabilityCalendar(slots: [
-            AvailabilitySlot(name: "Sleep", startTime: DateComponents(hour: 22, minute: 0), endTime: DateComponents(hour: 7, minute: 0), type: .sleep),
-            AvailabilitySlot(name: "Breakfast", startTime: DateComponents(hour: 8, minute: 0), endTime: DateComponents(hour: 9, minute: 0), type: .meal),
-            AvailabilitySlot(name: "Morning Available", startTime: DateComponents(hour: 9, minute: 0), endTime: DateComponents(hour: 12, minute: 0), type: .available),
-            AvailabilitySlot(name: "Lunch", startTime: DateComponents(hour: 12, minute: 0), endTime: DateComponents(hour: 13, minute: 0), type: .meal),
-            AvailabilitySlot(name: "Afternoon Available", startTime: DateComponents(hour: 13, minute: 0), endTime: DateComponents(hour: 17, minute: 0), type: .available),
-            AvailabilitySlot(name: "Dinner", startTime: DateComponents(hour: 19, minute: 0), endTime: DateComponents(hour: 20, minute: 0), type: .meal)
+            // Hotel overnight (sleep)
+            AvailabilitySlot(name: "Hotel Overnight", startTime: DateComponents(hour: 19, minute: 0), endTime: DateComponents(hour: 10, minute: 0), type: .sleep),
+            // Attractions
+            AvailabilitySlot(name: "Attraction Morning", startTime: DateComponents(hour: 10, minute: 0), endTime: DateComponents(hour: 12, minute: 0), type: .available),
+            AvailabilitySlot(name: "Attraction Afternoon", startTime: DateComponents(hour: 13, minute: 0), endTime: DateComponents(hour: 17, minute: 0), type: .available),
+            // Venues
+            AvailabilitySlot(name: "Venue Lunch", startTime: DateComponents(hour: 12, minute: 0), endTime: DateComponents(hour: 13, minute: 0), type: .venue),
+            AvailabilitySlot(name: "Venue Evening", startTime: DateComponents(hour: 17, minute: 0), endTime: DateComponents(hour: 19, minute: 0), type: .venue)
         ])
     }
 
@@ -30,6 +32,7 @@ struct PersonalAvailabilityCalendar: Codable {
     static func generateChronologicalTimeline(
         dayDate: Date,
         attractions: [TouristAttraction],
+        venues: [Venue], // <-- Added venues parameter
         transitRoutes: [TransitRoute],
         hotel: Hotel?,
         calendar: PersonalAvailabilityCalendar = PersonalAvailabilityCalendar.defaultCalendar()
@@ -37,7 +40,8 @@ struct PersonalAvailabilityCalendar: Codable {
         let cal = Calendar.current
         var items: [UnifiedTimelineItem] = []
         var remainingAttractions = attractions
-        // Meals and sleep
+        var remainingVenues = venues // <-- Track remaining venues
+        // Meals, sleep, attractions, venues
         for slot in calendar.slots {
             let slotStart = cal.date(bySettingHour: slot.startTime.hour ?? 0, minute: slot.startTime.minute ?? 0, second: 0, of: dayDate) ?? dayDate
             let slotEnd = cal.date(bySettingHour: slot.endTime.hour ?? 0, minute: slot.endTime.minute ?? 0, second: 0, of: dayDate) ?? dayDate.addingTimeInterval(3600)
@@ -54,6 +58,15 @@ struct PersonalAvailabilityCalendar: Codable {
                     let attractionEnd = min(slotTime.addingTimeInterval(duration), slotEnd)
                     items.append(.attraction(attraction: attraction, start: slotTime, end: attractionEnd))
                     slotTime = attractionEnd
+                }
+            case .venue:
+                var slotTime = slotStart
+                while !remainingVenues.isEmpty && slotTime < slotEnd {
+                    let venue = remainingVenues.removeFirst()
+                    let duration: TimeInterval = 60 * 60 // 1 hour default for venue
+                    let venueEnd = min(slotTime.addingTimeInterval(duration), slotEnd)
+                    items.append(.venue(venue: venue, start: slotTime, end: venueEnd)) // <-- Use .venue case
+                    slotTime = venueEnd
                 }
             }
         }
@@ -79,6 +92,7 @@ enum UnifiedTimelineItem: Identifiable {
     case transit(route: TransitRoute, start: Date, end: Date)
     case meal(name: String, start: Date, end: Date)
     case sleep(start: Date, end: Date)
+    case venue(venue: Venue, start: Date, end: Date) // <-- Added venue case
     
     var id: UUID {
         switch self {
@@ -87,6 +101,7 @@ enum UnifiedTimelineItem: Identifiable {
         case .transit(let r, _, _): return r.id
         case .meal(_, let start, _): return UUID(uuidString: "meal-\(start.timeIntervalSince1970)") ?? UUID()
         case .sleep(let start, _): return UUID(uuidString: "sleep-\(start.timeIntervalSince1970)") ?? UUID()
+        case .venue(let v, let start, _): return UUID(uuidString: "venue-\(v.id)-\(start.timeIntervalSince1970)") ?? UUID()
         }
     }
     var start: Date {
@@ -96,6 +111,7 @@ enum UnifiedTimelineItem: Identifiable {
         case .transit(_, let s, _): return s
         case .meal(_, let s, _): return s
         case .sleep(let s, _): return s
+        case .venue(_, let s, _): return s // <-- Handle venue start
         }
     }
     var end: Date {
@@ -105,6 +121,7 @@ enum UnifiedTimelineItem: Identifiable {
         case .transit(_, _, let e): return e
         case .meal(_, _, let e): return e
         case .sleep(_, let e): return e
+        case .venue(_, _, let e): return e // <-- Handle venue end
         }
     }
 } 

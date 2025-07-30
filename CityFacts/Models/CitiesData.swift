@@ -16,7 +16,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 35.6762, longitude: 139.6503),
             timezone: "Asia/Tokyo",
-            imageURLs: ["https://images.unsplash.com/photo-1540959733332-eab4deabeeaf"],
+            imageURL: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf",
             facts: [
                 "Tokyo was formerly known as Edo",
                 "Home to the world's busiest pedestrian crossing",
@@ -36,7 +36,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 28.6139, longitude: 77.2090),
             timezone: "Asia/Kolkata",
-            imageURLs: ["https://images.unsplash.com/photo-1587474260584-136574528ed5"],
+            imageURL: "https://images.unsplash.com/photo-1587474260584-136574528ed5",
             facts: [
                 "Delhi was designed by British architects",
                 "It has the largest comprehensive metro system in India",
@@ -56,7 +56,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 31.2304, longitude: 121.4737),
             timezone: "Asia/Shanghai",
-            imageURLs: ["https://images.unsplash.com/photo-1548919973-5cef591cdbc9"],
+            imageURL: "https://images.unsplash.com/photo-1548919973-5cef591cdbc9",
             facts: [
                 "Shanghai is the world's largest city proper by population",
                 "Home to the world's second-tallest building",
@@ -76,7 +76,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: -23.5505, longitude: -46.6333),
             timezone: "America/Sao_Paulo",
-            imageURLs: ["https://images.unsplash.com/photo-1543059080-f9b1272213d5"],
+            imageURL: "https://images.unsplash.com/photo-1543059080-f9b1272213d5",
             facts: [
                 "Largest city in the Southern Hemisphere",
                 "Has the largest Japanese population outside Japan",
@@ -96,7 +96,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 19.4326, longitude: -99.1332),
             timezone: "America/Mexico_City",
-            imageURLs: ["https://images.unsplash.com/photo-1518105779142-d424fb227ae3"],
+            imageURL: "https://images.unsplash.com/photo-1518105779142-d424fb227ae3",
             facts: [
                 "Built on the ruins of the Aztec capital Tenochtitlan",
                 "Has the largest number of museums in the world",
@@ -116,7 +116,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 30.0444, longitude: 31.2357),
             timezone: "Africa/Cairo",
-            imageURLs: ["https://images.unsplash.com/photo-1572252009286-268acec5ca0a"],
+            imageURL: "https://images.unsplash.com/photo-1572252009286-268acec5ca0a",
             facts: [
                 "Oldest Islamic city in Africa",
                 "Home to the oldest and largest film industry in the Arab world",
@@ -136,7 +136,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 23.8103, longitude: 90.4125),
             timezone: "Asia/Dhaka",
-            imageURLs: ["https://images.unsplash.com/photo-1583422409516-2895a77efded"],
+            imageURL: "https://images.unsplash.com/photo-1583422409516-2895a77efded",
             facts: [
                 "One of the most densely populated cities in the world",
                 "Known as the City of Mosques",
@@ -156,7 +156,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: -6.2088, longitude: 106.8456),
             timezone: "Asia/Jakarta",
-            imageURLs: ["https://images.unsplash.com/photo-1555899434-94d1368aa7af"],
+            imageURL: "https://images.unsplash.com/photo-1555899434-94d1368aa7af",
             facts: [
                 "Built on swampland in the 17th century",
                 "Home to the world's largest urban park",
@@ -176,7 +176,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 14.5995, longitude: 120.9842),
             timezone: "Asia/Manila",
-            imageURLs: ["https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86"],
+            imageURL: "https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86",
             facts: [
                 "One of the most densely populated cities in the world",
                 "First established as a fortress city",
@@ -196,7 +196,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 37.5665, longitude: 126.9780),
             timezone: "Asia/Seoul",
-            imageURLs: ["https://images.unsplash.com/photo-1538669715315-155098f0fb1d"],
+            imageURL: "https://images.unsplash.com/photo-1538669715315-155098f0fb1d",
             facts: [
                 "One of the world's leading digital cities",
                 "Has the world's fastest internet speeds",
@@ -216,7 +216,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 55.7558, longitude: 37.6173),
             timezone: "Europe/Moscow",
-            imageURLs: ["https://images.unsplash.com/photo-1513326738677-b964603b136d"],
+            imageURL: "https://images.unsplash.com/photo-1513326738677-b964603b136d",
             facts: [
                 "Home to the world's most used metro system",
                 "Has the most billionaire residents of any city",
@@ -236,7 +236,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 51.5074, longitude: -0.1278),
             timezone: "Europe/London",
-            imageURLs: ["https://images.unsplash.com/photo-1513635269975-59663e0ac1ad"],
+            imageURL: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad",
             facts: [
                 "Has been a major settlement for two millennia",
                 "Home to four World Heritage Sites",
@@ -256,7 +256,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 48.8566, longitude: 2.3522),
             timezone: "Europe/Paris",
-            imageURLs: ["https://images.unsplash.com/photo-1502602898657-3e91760cbb34"],
+            imageURL: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34",
             facts: [
                 "Most visited city in the world",
                 "Home to world's largest art museum",
@@ -276,7 +276,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 52.5200, longitude: 13.4050),
             timezone: "Europe/Berlin",
-            imageURLs: ["https://images.unsplash.com/photo-1560969184-10fe8719e047"],
+            imageURL: "https://images.unsplash.com/photo-1560969184-10fe8719e047",
             facts: [
                 "Nine times the size of Paris",
                 "More bridges than Venice",
@@ -296,7 +296,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 41.9028, longitude: 12.4964),
             timezone: "Europe/Rome",
-            imageURLs: ["https://images.unsplash.com/photo-1552832230-c0197dd311b5"],
+            imageURL: "https://images.unsplash.com/photo-1552832230-c0197dd311b5",
             facts: [
                 "Known as the Eternal City",
                 "Contains the world's smallest country",
@@ -316,7 +316,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 40.4168, longitude: -3.7038),
             timezone: "Europe/Madrid",
-            imageURLs: ["https://images.unsplash.com/photo-1543783207-ec64e4d95325"],
+            imageURL: "https://images.unsplash.com/photo-1543783207-ec64e4d95325",
             facts: [
                 "Highest capital city in Europe",
                 "Home to the world's oldest restaurant",
@@ -336,7 +336,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 38.9072, longitude: -77.0369),
             timezone: "America/New_York",
-            imageURLs: ["https://images.unsplash.com/photo-1501466044931-62695aada8e9"],
+            imageURL: "https://images.unsplash.com/photo-1501466044931-62695aada8e9",
             facts: [
                 "Planned by French architect Pierre Charles L'Enfant",
                 "Not part of any U.S. state",
@@ -356,7 +356,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 45.4215, longitude: -75.6972),
             timezone: "America/Toronto",
-            imageURLs: ["https://images.unsplash.com/photo-1503883705143-45bc45fa0c43"],
+            imageURL: "https://images.unsplash.com/photo-1503883705143-45bc45fa0c43",
             facts: [
                 "Most educated city in Canada",
                 "World's largest naturally frozen skating rink",
@@ -376,7 +376,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: -34.6037, longitude: -58.3816),
             timezone: "America/Argentina/Buenos_Aires",
-            imageURLs: ["https://images.unsplash.com/photo-1589909202802-8f4aadce1849"],
+            imageURL: "https://images.unsplash.com/photo-1589909202802-8f4aadce1849",
             facts: [
                 "Known as the Paris of South America",
                 "Has the highest concentration of theatres in the world",
@@ -396,7 +396,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: -12.0464, longitude: -77.0428),
             timezone: "America/Lima",
-            imageURLs: ["https://images.unsplash.com/photo-1531968455001-5c5272a41129"],
+            imageURL: "https://images.unsplash.com/photo-1531968455001-5c5272a41129",
             facts: [
                 "Founded by Spanish conquistador Francisco Pizarro",
                 "Known as the Gastronomical Capital of the Americas",
@@ -416,7 +416,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: -33.8688, longitude: 151.2093),
             timezone: "Australia/Sydney",
-            imageURLs: ["https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9"],
+            imageURL: "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9",
             facts: [
                 "Oldest city in Australia",
                 "Built on the world's largest natural harbor",
@@ -436,7 +436,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 13.7563, longitude: 100.5018),
             timezone: "Asia/Bangkok",
-            imageURLs: ["https://images.unsplash.com/photo-1508009603885-50cf7c579365"],
+            imageURL: "https://images.unsplash.com/photo-1508009603885-50cf7c579365",
             facts: [
                 "Full ceremonial name is the longest place name in the world",
                 "Known as the City of Angels",
@@ -456,7 +456,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 48.2082, longitude: 16.3738),
             timezone: "Europe/Vienna",
-            imageURLs: ["https://images.unsplash.com/photo-1516550893923-42d28e5677af"],
+            imageURL: "https://images.unsplash.com/photo-1516550893923-42d28e5677af",
             facts: [
                 "Consistently ranked as the world's most liveable city",
                 "Classical music capital of the world",
@@ -476,7 +476,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 55.6761, longitude: 12.5683),
             timezone: "Europe/Copenhagen",
-            imageURLs: ["https://images.unsplash.com/photo-1513622470522-26c3c8a854bc"],
+            imageURL: "https://images.unsplash.com/photo-1513622470522-26c3c8a854bc",
             facts: [
                 "One of the most bicycle-friendly cities in the world",
                 "Home to the two oldest amusement parks in the world",
@@ -496,7 +496,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: 59.3293, longitude: 18.0686),
             timezone: "Europe/Stockholm",
-            imageURLs: ["https://images.unsplash.com/photo-1509356843151-3e7d96241e34"],
+            imageURL: "https://images.unsplash.com/photo-1509356843151-3e7d96241e34",
             facts: [
                 "Built on 14 islands connected by 57 bridges",
                 "First city to have an environmental program",
@@ -516,7 +516,7 @@ extension CityStore {
             ],
             coordinates: City.Coordinates(latitude: -41.2866, longitude: 174.7756),
             timezone: "Pacific/Auckland",
-            imageURLs: ["https://images.unsplash.com/photo-1589871973318-9ca1258faa5d"],
+            imageURL: "https://images.unsplash.com/photo-1589871973318-9ca1258faa5d",
             facts: [
                 "Windiest city in the world",
                 "More cafes per capita than New York City",

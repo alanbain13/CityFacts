@@ -58,6 +58,7 @@ struct TripTimeline: Codable, Identifiable {
         case hotel = "hotel"
         case meal = "meal"
         case sleep = "sleep"
+        case venue = "venue" // <-- Added venue case
         
         var icon: String {
             switch self {
@@ -66,6 +67,7 @@ struct TripTimeline: Codable, Identifiable {
             case .hotel: return "bed.double.fill"
             case .meal: return "fork.knife"
             case .sleep: return "moon.fill"
+            case .venue: return "building.2.crop.circle.fill" // <-- Added venue icon
             }
         }
         
@@ -76,6 +78,7 @@ struct TripTimeline: Codable, Identifiable {
             case .hotel: return "purple"
             case .meal: return "orange"
             case .sleep: return "indigo"
+            case .venue: return "red" // <-- Added venue color
             }
         }
     }
@@ -87,6 +90,7 @@ struct TripTimeline: Codable, Identifiable {
         case hotel(Hotel)
         case meal(String) // meal type
         case sleep
+        case venue(Venue) // <-- Added venue case
         
         var displayTitle: String {
             switch self {
@@ -100,6 +104,8 @@ struct TripTimeline: Codable, Identifiable {
                 return mealType.capitalized
             case .sleep:
                 return "Sleep"
+            case .venue(let venue):
+                return venue.name // <-- Added venue title
             }
         }
         
@@ -115,6 +121,8 @@ struct TripTimeline: Codable, Identifiable {
                 return "Meal time"
             case .sleep:
                 return "Rest time"
+            case .venue(let venue):
+                return venue.category ?? "Venue" // <-- Added venue subtitle
             }
         }
     }
@@ -148,6 +156,7 @@ class TimelineDependencyResolver {
     static func generateTimeline(
         tripInfo: TripTimeline.TripInfo,
         attractions: [TouristAttraction],
+        venues: [Venue], // <-- Added venues parameter
         transitDays: [TransitDay],
         selectedHotels: [Int: Hotel?],
         availabilityCalendar: PersonalAvailabilityCalendar = PersonalAvailabilityCalendar.defaultCalendar()
@@ -231,6 +240,7 @@ class TimelineDependencyResolver {
             
             // Add availability-based events (meals, sleep, attractions)
             var remainingAttractions = attractionsForDay(dayIndex, totalAttractions: attractions, numberOfDays: numberOfDays)
+            var remainingVenues = venuesForDay(dayIndex, totalVenues: venues, numberOfDays: numberOfDays) // <-- Added venues tracking
             var eventSequence = dayDependencies.count + 1
             
             for slot in availabilityCalendar.slots {
@@ -328,6 +338,27 @@ class TimelineDependencyResolver {
                             slotTime = slotTime.addingTimeInterval(transitFromAttraction.elapsedTime)
                         }
                     }
+                case .venue:
+                    var slotTime = adjustedSlotStart
+                    while !remainingVenues.isEmpty && slotTime < adjustedSlotEnd {
+                        let venue = remainingVenues.removeFirst()
+                        let duration: TimeInterval = 60 * 60 // 1 hour default for venue
+                        let venueEnd = min(slotTime.addingTimeInterval(duration), adjustedSlotEnd)
+                        
+                        let venueEvent = TripTimeline.TimelineEvent(
+                            dayNumber: dayNumber,
+                            sequence: eventSequence,
+                            dependencies: dayDependencies,
+                            eventType: .venue,
+                            startTime: max(slotTime, tripStartTime),
+                            endTime: min(venueEnd, tripEndTime),
+                            data: .venue(venue)
+                        )
+                        allEvents.append(venueEvent)
+                        dayDependencies.append(venueEvent.id)
+                        eventSequence += 1
+                        slotTime = venueEnd
+                    }
                 }
             }
             
@@ -365,6 +396,13 @@ class TimelineDependencyResolver {
         let startIndex = dayIndex * attractionsPerDay
         let endIndex = min(startIndex + attractionsPerDay, totalAttractions.count)
         return Array(totalAttractions[startIndex..<endIndex])
+    }
+    
+    private static func venuesForDay(_ dayIndex: Int, totalVenues: [Venue], numberOfDays: Int) -> [Venue] {
+        let venuesPerDay = Int(ceil(Double(totalVenues.count) / Double(numberOfDays)))
+        let startIndex = dayIndex * venuesPerDay
+        let endIndex = min(startIndex + venuesPerDay, totalVenues.count)
+        return Array(totalVenues[startIndex..<endIndex])
     }
 }
 
@@ -457,6 +495,15 @@ class XMLTimelineSerializer: TimelineSerializer {
                             <start-time>\(timeFormatter.string(from: event.startTime))</start-time>
                             <end-time>\(timeFormatter.string(from: event.endTime))</end-time>
                         </sleep>
+                    """
+                case .venue(let venue):
+                    xml += """
+                        <venue>
+                            <name>\(venue.name)</name>
+                            <category>\(venue.category ?? "")</category>
+                            <start-time>\(timeFormatter.string(from: event.startTime))</start-time>
+                            <end-time>\(timeFormatter.string(from: event.endTime))</end-time>
+                        </venue>
                     """
                 }
                 
